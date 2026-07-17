@@ -1,0 +1,52 @@
+training_task:
+  - ssl          # Self-supervised pre-training phase
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+system:
+  cuda_id: 0
+  seed: 42
+
+# =============================================================================
+# DATA SETTINGS
+# =============================================================================
+data:
+  pdb_root: ../../GraPPI_data/curated_db
+  dist: "8"  # Distance threshold for graph construction (8A)
+  embedding_type: base  # Options: base, esm; will be overwritten by loaded checkpoint if available
+  min_nodes: 5  # Minimum number of nodes per chain
+  
+# =============================================================================
+# SSL PRE-TRAINING SETTINGS
+# =============================================================================
+ssl:
+  # Task settings
+  edge_mask_ratio: 0.25
+  use_intra_edges: True
+  intra_edge_mask_ratio: 0.15  # Fraction of interface-adjacent intra-edges to mask
+  intra_edge_beta: 0.65  # Loss = beta * L_inter + (1-beta) * L_intra
+  negative_ratio: 1.0
+  min_interface_edges: 5
+  strategy_type: dynamic # Options: dynamic, stratified, curriculum, hard_negative
+
+  # Model architecture
+  num_layers: 6
+  hidden_dim_power: 9  # Hidden dim = 2^10 = 1024
+  hgt_heads: 4
+  dropout: 0.2
+  message_style: gated_src # Options: gated_src, additive
+
+  use_checkpoint: True
+
+  # Training hyperparameters
+  batch_size: 40
+  n_epochs: 1500
+  lr: 0.0001
+  weight_decay: 0.001
+  clip_max_norm: 5.0
+  patience: 50
+  scheduler_t0: 10
+
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/

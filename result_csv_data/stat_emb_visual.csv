@@ -1,0 +1,244 @@
+pdb,model,n_iface,n_non_iface,DR_iface,DR_other,DR_pval
+1cmi,GraPPI,50,47,15.015,-15.974,3.27e-06
+1cmi,untrained GraPPI,50,47,0.951,-1.012,3.58e-01
+1cmi,shuffled GraPPI,50,47,4.440,-4.724,1.66e-01
+1cmi,shuffled GraPPI base,50,47,4.035,-4.293,1.44e-01
+1cmi,GraPPI base,50,47,9.688,-10.306,1.04e-05
+1cmi,untrained GraPPI base,50,47,2.380,-2.532,3.42e-02
+1cmi,GraPPI interf_mut,50,47,13.317,-14.167,4.11e-05
+1cmi,GraPPI base interf_mut,50,47,13.487,-14.347,2.08e-10
+1cmi,esm,50,47,0.139,-0.148,5.22e-01
+1p22,GraPPI,55,487,78.244,-8.837,2.29e-32
+1p22,untrained GraPPI,55,487,33.921,-3.831,9.90e-13
+1p22,shuffled GraPPI,55,487,11.842,-1.337,1.12e-01
+1p22,shuffled GraPPI base,55,487,10.263,-1.159,7.88e-02
+1p22,GraPPI base,55,487,55.140,-6.227,2.16e-33
+1p22,untrained GraPPI base,55,487,2.188,-0.247,2.11e-01
+1p22,GraPPI interf_mut,55,487,78.717,-8.890,1.71e-32
+1p22,GraPPI base interf_mut,55,487,55.334,-6.249,2.67e-33
+1p22,esm,55,487,10.066,-1.137,2.52e-12
+1us7,GraPPI,69,332,5.895,-1.225,3.97e-01
+1us7,untrained GraPPI,69,332,6.370,-1.324,1.16e-02
+1us7,shuffled GraPPI,69,332,5.836,-1.213,2.86e-01
+1us7,shuffled GraPPI base,69,332,4.657,-0.968,2.99e-01
+1us7,GraPPI base,69,332,4.398,-0.914,4.29e-01
+1us7,untrained GraPPI base,69,332,0.923,-0.192,4.16e-01
+1us7,GraPPI interf_mut,69,332,4.591,-0.954,4.34e-01
+1us7,GraPPI base interf_mut,69,332,6.115,-1.271,4.14e-01
+1us7,esm,69,332,0.980,-0.204,1.42e-01
+1vz6,GraPPI,192,560,0.969,-0.332,3.86e-01
+1vz6,untrained GraPPI,192,560,4.671,-1.601,3.10e-04
+1vz6,shuffled GraPPI,192,560,1.168,-0.400,3.66e-01
+1vz6,shuffled GraPPI base,192,560,1.093,-0.375,3.27e-01
+1vz6,GraPPI base,192,560,3.776,-1.295,3.82e-01
+1vz6,untrained GraPPI base,192,560,0.824,-0.282,3.59e-01
+1vz6,GraPPI interf_mut,192,560,1.336,-0.458,4.02e-01
+1vz6,GraPPI base interf_mut,192,560,2.649,-0.908,4.91e-01
+1vz6,esm,192,560,0.882,-0.302,2.01e-02
+1wm0,GraPPI,46,236,34.639,-6.752,4.42e-13
+1wm0,untrained GraPPI,46,236,2.125,-0.414,3.34e-01
+1wm0,shuffled GraPPI,46,236,9.338,-1.820,5.47e-02
+1wm0,shuffled GraPPI base,46,236,13.719,-2.674,4.73e-02
+1wm0,GraPPI base,46,236,48.293,-9.413,3.18e-26
+1wm0,untrained GraPPI base,46,236,2.440,-0.476,1.72e-01
+1wm0,GraPPI interf_mut,46,236,33.612,-6.552,6.51e-13
+1wm0,GraPPI base interf_mut,46,236,46.603,-9.084,6.37e-27
+1wm0,esm,46,236,0.724,-0.141,2.99e-01
+2g47,GraPPI,101,874,29.490,-3.408,9.15e-18
+2g47,untrained GraPPI,101,874,10.691,-1.235,5.08e-06
+2g47,shuffled GraPPI,101,874,2.667,-0.308,2.75e-01
+2g47,shuffled GraPPI base,101,874,6.013,-0.695,1.02e-01
+2g47,GraPPI base,101,874,38.827,-4.487,8.99e-43
+2g47,untrained GraPPI base,101,874,2.801,-0.324,1.16e-01
+2g47,GraPPI interf_mut,101,874,19.146,-2.213,8.06e-08
+2g47,GraPPI base interf_mut,101,874,40.518,-4.682,1.94e-47
+2g47,esm,101,874,3.140,-0.363,2.64e-06
+2uzi,GraPPI,80,304,11.126,-2.928,2.12e-02
+2uzi,untrained GraPPI,80,304,2.605,-0.686,6.18e-01
+2uzi,shuffled GraPPI,80,304,6.926,-1.823,2.06e-01
+2uzi,shuffled GraPPI base,80,304,5.456,-1.436,2.95e-01
+2uzi,GraPPI base,80,304,4.121,-1.084,2.22e-01
+2uzi,untrained GraPPI base,80,304,5.588,-1.471,4.86e-02
+2uzi,GraPPI interf_mut,80,304,12.367,-3.254,2.05e-02
+2uzi,GraPPI base interf_mut,80,304,5.805,-1.528,4.03e-02
+2uzi,esm,80,304,0.077,-0.020,7.44e-01
+2vn5,GraPPI,75,123,21.080,-12.853,1.11e-08
+2vn5,untrained GraPPI,75,123,5.343,-3.258,1.38e-05
+2vn5,shuffled GraPPI,75,123,7.274,-4.436,7.29e-02
+2vn5,shuffled GraPPI base,75,123,9.309,-5.676,5.61e-02
+2vn5,GraPPI base,75,123,18.425,-11.235,8.88e-09
+2vn5,untrained GraPPI base,75,123,2.898,-1.767,5.01e-01
+2vn5,GraPPI interf_mut,75,123,20.861,-12.720,9.57e-09
+2vn5,GraPPI base interf_mut,75,123,16.322,-9.952,9.57e-09
+2vn5,esm,75,123,0.758,-0.462,3.91e-02
+3dmy,GraPPI,223,650,0.688,-0.236,5.42e-01
+3dmy,untrained GraPPI,223,650,5.609,-1.924,3.66e-07
+3dmy,shuffled GraPPI,223,650,0.877,-0.301,3.41e-01
+3dmy,shuffled GraPPI base,223,650,1.128,-0.387,3.88e-01
+3dmy,GraPPI base,223,650,4.001,-1.372,3.35e-01
+3dmy,untrained GraPPI base,223,650,1.813,-0.622,1.16e-01
+3dmy,GraPPI interf_mut,223,650,0.768,-0.263,5.45e-01
+3dmy,GraPPI base interf_mut,223,650,4.206,-1.443,3.01e-01
+3dmy,esm,223,650,1.417,-0.486,2.48e-04
+3e2u,GraPPI,54,40,10.201,-13.771,8.25e-04
+3e2u,untrained GraPPI,54,40,2.577,-3.479,7.80e-02
+3e2u,shuffled GraPPI,54,40,7.217,-9.744,9.35e-02
+3e2u,shuffled GraPPI base,54,40,6.492,-8.765,7.85e-02
+3e2u,GraPPI base,54,40,9.500,-12.825,4.48e-07
+3e2u,untrained GraPPI base,54,40,3.407,-4.600,5.63e-02
+3e2u,GraPPI interf_mut,54,40,14.567,-19.666,2.36e-06
+3e2u,GraPPI base interf_mut,54,40,9.429,-12.729,2.19e-06
+3e2u,esm,54,40,0.294,-0.398,1.84e-01
+3ong,GraPPI,75,196,28.223,-10.800,6.84e-05
+3ong,untrained GraPPI,75,196,7.091,-2.713,3.35e-04
+3ong,shuffled GraPPI,75,196,17.648,-6.753,1.08e-02
+3ong,shuffled GraPPI base,75,196,17.439,-6.673,9.01e-03
+3ong,GraPPI base,75,196,32.859,-12.573,8.86e-09
+3ong,untrained GraPPI base,75,196,3.238,-1.239,1.86e-01
+3ong,GraPPI interf_mut,75,196,27.689,-10.595,5.05e-05
+3ong,GraPPI base interf_mut,75,196,28.804,-11.022,9.68e-05
+3ong,esm,75,196,1.668,-0.638,8.45e-04
+4bi8,GraPPI,96,161,15.343,-9.149,2.76e-06
+4bi8,untrained GraPPI,96,161,2.410,-1.437,1.11e-02
+4bi8,shuffled GraPPI,96,161,10.478,-6.247,4.73e-02
+4bi8,shuffled GraPPI base,96,161,7.628,-4.548,4.90e-02
+4bi8,GraPPI base,96,161,12.003,-7.157,1.31e-05
+4bi8,untrained GraPPI base,96,161,6.028,-3.594,2.94e-01
+4bi8,GraPPI interf_mut,96,161,15.107,-9.008,1.22e-05
+4bi8,GraPPI base interf_mut,96,161,12.925,-7.707,1.33e-05
+4bi8,esm,96,161,0.464,-0.277,2.61e-01
+4r1h,GraPPI,100,128,24.881,-19.438,2.38e-12
+4r1h,untrained GraPPI,100,128,3.360,-2.625,1.95e-01
+4r1h,shuffled GraPPI,100,128,2.613,-2.042,2.42e-01
+4r1h,shuffled GraPPI base,100,128,2.845,-2.222,2.96e-01
+4r1h,GraPPI base,100,128,3.344,-2.613,3.67e-01
+4r1h,untrained GraPPI base,100,128,0.891,-0.696,4.34e-01
+4r1h,GraPPI interf_mut,100,128,33.213,-25.948,2.31e-22
+4r1h,GraPPI base interf_mut,100,128,2.520,-1.969,4.01e-01
+4r1h,esm,100,128,1.832,-1.431,2.32e-02
+4z27,GraPPI,150,101,0.537,-0.798,3.68e-01
+4z27,untrained GraPPI,150,101,3.263,-4.846,6.04e-05
+4z27,shuffled GraPPI,150,101,1.252,-1.860,2.80e-01
+4z27,shuffled GraPPI base,150,101,1.455,-2.161,3.27e-01
+4z27,GraPPI base,150,101,3.004,-4.462,1.25e-01
+4z27,untrained GraPPI base,150,101,0.855,-1.270,4.61e-01
+4z27,GraPPI interf_mut,150,101,0.748,-1.111,4.50e-01
+4z27,GraPPI base interf_mut,150,101,2.501,-3.714,1.95e-01
+4z27,esm,150,101,0.964,-1.432,2.14e-04
+5c6d,GraPPI,43,281,41.939,-6.418,1.01e-17
+5c6d,untrained GraPPI,43,281,5.568,-0.852,1.73e-02
+5c6d,shuffled GraPPI,43,281,7.387,-1.130,1.38e-01
+5c6d,shuffled GraPPI base,43,281,11.722,-1.794,1.83e-02
+5c6d,GraPPI base,43,281,42.067,-6.437,4.82e-21
+5c6d,untrained GraPPI base,43,281,7.129,-1.091,1.44e-01
+5c6d,GraPPI interf_mut,43,281,44.021,-6.736,8.13e-19
+5c6d,GraPPI base interf_mut,43,281,42.094,-6.441,1.08e-21
+5c6d,esm,43,281,2.038,-0.312,1.36e-02
+5c7j,GraPPI,74,384,42.311,-8.154,9.80e-24
+5c7j,untrained GraPPI,74,384,0.406,-0.078,4.75e-01
+5c7j,shuffled GraPPI,74,384,19.220,-3.704,2.15e-03
+5c7j,shuffled GraPPI base,74,384,29.654,-5.715,4.72e-03
+5c7j,GraPPI base,74,384,49.309,-9.502,2.95e-20
+5c7j,untrained GraPPI base,74,384,7.162,-1.380,6.03e-02
+5c7j,GraPPI interf_mut,74,384,43.220,-8.329,1.52e-24
+5c7j,GraPPI base interf_mut,74,384,49.119,-9.466,2.46e-22
+5c7j,esm,74,384,0.127,-0.024,5.66e-01
+5cer,GraPPI,142,452,41.499,-13.037,1.57e-19
+5cer,untrained GraPPI,142,452,6.555,-2.059,6.90e-09
+5cer,shuffled GraPPI,142,452,31.931,-10.032,1.99e-07
+5cer,shuffled GraPPI base,142,452,36.920,-11.599,1.60e-07
+5cer,GraPPI base,142,452,49.909,-15.679,6.84e-23
+5cer,untrained GraPPI base,142,452,14.862,-4.669,9.95e-07
+5cer,GraPPI interf_mut,142,452,41.633,-13.080,2.12e-19
+5cer,GraPPI base interf_mut,142,452,50.086,-15.735,4.90e-23
+5cer,esm,142,452,0.671,-0.211,3.25e-01
+5h2w,GraPPI,134,299,16.683,-7.476,5.23e-06
+5h2w,untrained GraPPI,134,299,0.057,-0.026,3.05e-01
+5h2w,shuffled GraPPI,134,299,3.150,-1.412,2.65e-01
+5h2w,shuffled GraPPI base,134,299,2.684,-1.203,1.40e-01
+5h2w,GraPPI base,134,299,15.435,-6.917,5.09e-12
+5h2w,untrained GraPPI base,134,299,9.492,-4.254,5.16e-04
+5h2w,GraPPI interf_mut,134,299,16.115,-7.222,8.00e-06
+5h2w,GraPPI base interf_mut,134,299,13.836,-6.201,8.78e-09
+5h2w,esm,134,299,1.170,-0.525,1.09e-01
+5w1m,GraPPI,97,493,65.781,-12.943,7.88e-22
+5w1m,untrained GraPPI,97,493,24.931,-4.905,1.53e-23
+5w1m,shuffled GraPPI,97,493,40.032,-7.876,6.44e-06
+5w1m,shuffled GraPPI base,97,493,36.533,-7.188,1.34e-05
+5w1m,GraPPI base,97,493,56.340,-11.085,4.04e-22
+5w1m,untrained GraPPI base,97,493,7.404,-1.457,4.75e-04
+5w1m,GraPPI interf_mut,97,493,65.391,-12.866,9.16e-22
+5w1m,GraPPI base interf_mut,97,493,58.206,-11.452,2.43e-22
+5w1m,esm,97,493,8.563,-1.685,2.54e-25
+5wsv,GraPPI,115,55,2.566,-5.366,2.09e-01
+5wsv,untrained GraPPI,115,55,9.913,-20.727,3.05e-13
+5wsv,shuffled GraPPI,115,55,1.916,-4.006,2.37e-01
+5wsv,shuffled GraPPI base,115,55,8.645,-18.075,1.02e-02
+5wsv,GraPPI base,115,55,10.264,-21.460,1.66e-05
+5wsv,untrained GraPPI base,115,55,2.940,-6.147,9.51e-03
+5wsv,GraPPI interf_mut,115,55,1.833,-3.833,2.69e-01
+5wsv,GraPPI base interf_mut,115,55,10.370,-21.683,1.17e-05
+5wsv,esm,115,55,3.347,-6.998,3.18e-11
+6a9x,GraPPI,65,70,1.705,-1.583,2.75e-01
+6a9x,untrained GraPPI,65,70,2.709,-2.516,4.32e-02
+6a9x,shuffled GraPPI,65,70,4.851,-4.505,1.55e-01
+6a9x,shuffled GraPPI base,65,70,8.772,-8.145,5.86e-03
+6a9x,GraPPI base,65,70,17.812,-16.539,2.43e-19
+6a9x,untrained GraPPI base,65,70,2.291,-2.128,1.84e-01
+6a9x,GraPPI interf_mut,65,70,0.934,-0.868,3.26e-01
+6a9x,GraPPI base interf_mut,65,70,17.990,-16.705,4.69e-20
+6a9x,esm,65,70,1.044,-0.969,3.78e-02
+6gum,GraPPI,87,179,30.838,-14.988,1.52e-05
+6gum,untrained GraPPI,87,179,7.267,-3.532,4.97e-05
+6gum,shuffled GraPPI,87,179,19.617,-9.535,7.16e-03
+6gum,shuffled GraPPI base,87,179,15.968,-7.761,6.69e-03
+6gum,GraPPI base,87,179,24.819,-12.063,9.04e-07
+6gum,untrained GraPPI base,87,179,8.718,-4.237,7.32e-03
+6gum,GraPPI interf_mut,87,179,27.589,-13.409,2.03e-05
+6gum,GraPPI base interf_mut,87,179,26.203,-12.736,1.50e-07
+6gum,esm,87,179,2.086,-1.014,5.84e-05
+6iqj,GraPPI,48,95,36.647,-18.516,7.02e-21
+6iqj,untrained GraPPI,48,95,4.998,-2.525,6.23e-03
+6iqj,shuffled GraPPI,48,95,8.328,-4.208,7.22e-02
+6iqj,shuffled GraPPI base,48,95,8.234,-4.161,3.07e-02
+6iqj,GraPPI base,48,95,26.886,-13.584,9.19e-22
+6iqj,untrained GraPPI base,48,95,5.118,-2.586,8.73e-02
+6iqj,GraPPI interf_mut,48,95,36.617,-18.501,7.92e-21
+6iqj,GraPPI base interf_mut,48,95,27.703,-13.997,1.84e-21
+6iqj,esm,48,95,1.685,-0.851,7.03e-03
+6isc,GraPPI,85,252,34.776,-11.730,3.73e-12
+6isc,untrained GraPPI,85,252,2.716,-0.916,4.35e-02
+6isc,shuffled GraPPI,85,252,13.054,-4.403,8.71e-03
+6isc,shuffled GraPPI base,85,252,20.726,-6.991,8.30e-03
+6isc,GraPPI base,85,252,33.882,-11.428,5.55e-09
+6isc,untrained GraPPI base,85,252,13.941,-4.702,8.87e-03
+6isc,GraPPI interf_mut,85,252,33.050,-11.148,5.42e-10
+6isc,GraPPI base interf_mut,85,252,33.005,-11.132,3.74e-09
+6isc,esm,85,252,0.136,-0.046,3.59e-01
+6lqo,GraPPI,126,223,30.889,-17.453,6.09e-23
+6lqo,untrained GraPPI,126,223,6.704,-3.788,2.69e-11
+6lqo,shuffled GraPPI,126,223,24.355,-13.761,8.96e-05
+6lqo,shuffled GraPPI base,126,223,23.736,-13.411,5.87e-05
+6lqo,GraPPI base,126,223,36.803,-20.795,2.15e-23
+6lqo,untrained GraPPI base,126,223,14.833,-8.381,8.90e-07
+6lqo,GraPPI interf_mut,126,223,27.178,-15.356,6.19e-19
+6lqo,GraPPI base interf_mut,126,223,37.242,-21.043,7.83e-23
+6lqo,esm,126,223,0.614,-0.347,4.41e-02
+6qev,GraPPI,61,1299,95.770,-4.497,3.29e-39
+6qev,untrained GraPPI,61,1299,23.931,-1.124,7.14e-28
+6qev,shuffled GraPPI,61,1299,27.213,-1.278,3.03e-03
+6qev,shuffled GraPPI base,61,1299,25.899,-1.216,2.65e-03
+6qev,GraPPI base,61,1299,86.247,-4.050,1.15e-39
+6qev,untrained GraPPI base,61,1299,8.252,-0.388,1.83e-01
+6qev,GraPPI interf_mut,61,1299,104.571,-4.911,2.62e-39
+6qev,GraPPI base interf_mut,61,1299,85.038,-3.993,9.95e-40
+6qev,esm,61,1299,7.487,-0.352,9.98e-23
+7tre,GraPPI,94,992,62.701,-5.941,3.18e-31
+7tre,untrained GraPPI,94,992,8.818,-0.836,8.56e-05
+7tre,shuffled GraPPI,94,992,44.742,-4.240,2.08e-05
+7tre,shuffled GraPPI base,94,992,50.707,-4.805,4.20e-05
+7tre,GraPPI base,94,992,79.001,-7.486,2.08e-33
+7tre,untrained GraPPI base,94,992,2.307,-0.219,4.52e-02
+7tre,GraPPI interf_mut,94,992,63.106,-5.980,1.31e-32
+7tre,GraPPI base interf_mut,94,992,78.332,-7.423,2.51e-33
+7tre,esm,94,992,2.281,-0.216,5.10e-03

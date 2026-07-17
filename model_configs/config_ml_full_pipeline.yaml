@@ -1,0 +1,137 @@
+# =============================================================================
+# TRAINING PHASES
+# =============================================================================
+training_task:
+  - ml_dg_reg
+  - ml_mutation
+  - ml_disc_binder
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+system:
+  cuda_id: 0
+  seed: 42
+
+# =============================================================================
+# DATA SETTINGS
+# =============================================================================
+data:
+  pdb_root: ../../GraPPI_data/curated_db
+  dist: "8"
+  embedding_type: base  # Options: base, esm
+  min_nodes: 5
+
+# =============================================================================
+# ENCODER / TASK SETTINGS  (reuses the dg_reg section)
+# =============================================================================
+dg_reg:
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/6layers_7hdim/ssl_edge_best.pt
+  batch_size: 30
+  # Architecture (auto-loaded from checkpoint; set null to auto-detect)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  use_checkpoint: True
+  message_style: null  # Options: gated_src, additive
+
+  # Jumping Knowledge — optional layer aggregation before mean-pooling
+  use_jk: True          # Default off (final layer only)
+  jk_mode: mean          # Options: sum, mean, max, concat
+
+  # Save directory — results written under <save_dir>/<layers>layers_<hdim>hdim[_<emb>][_<strategy>][_additive]/
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+# =============================================================================
+# ENCODER / TASK SETTINGS  (reuses the mutation section)
+# =============================================================================
+mutation:
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/6layers_7hdim/ssl_edge_best.pt
+  batch_size: 40
+  n_folds: 5
+  fold_strategy: random   # or 'group'             # Number of folds for seeded GroupKFold CV
+  # Architecture (auto-loaded from checkpoint; set null to auto-detect)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  use_checkpoint: True
+  message_style: null  # Options: gated_src, additive
+
+  # Jumping Knowledge — optional layer aggregation before mean-pooling
+  use_jk: True          # Default off (final layer only)
+  jk_mode: mean          # Options: sum, mean, max, concat
+
+  # DDG input mode
+  ddg_input_mode: concat_diff  # Options: concat_diff, diff
+
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+# =============================================================================
+# ENCODER / TASK SETTINGS  (reuses the disc_binder section)
+# =============================================================================
+disc_binder:
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/6layers_7hdim/ssl_edge_best.pt
+  batch_size: 45
+  # Architecture (auto-loaded from checkpoint; set null to auto-detect)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  use_checkpoint: True
+  message_style: null  # Options: gated_src, additive
+
+  # Jumping Knowledge — optional layer aggregation before mean-pooling
+  use_jk: True          # Default off (final layer only)
+  jk_mode: mean          # Options: sum, mean, max, concat
+
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+# =============================================================================
+# ML HYPER-PARAMETERS — per-task (nested under task key)
+# If a task key is missing, falls back to top-level ml keys.
+# =============================================================================
+ml:
+  # --- dG regression (2.9k train+val, 160 test — small, regression) ---------
+  dg_reg:
+    n_jobs:              20
+    rf_n_estimators:     300
+    rf_max_depth:        10
+    rf_min_samples_leaf: 10       # stronger regularization for small data
+    rf_max_features:     sqrt
+    gbt_n_estimators:    200
+    gbt_max_depth:       4        # shallow to avoid overfitting
+    gbt_learning_rate:   0.05     # lower LR + more iters for small data
+    dt_max_depth:        8
+    dt_min_samples_leaf: 15
+    svm_C:               10
+    svm_epsilon:         0.1
+
+  # --- ddG regression (5k train+val, 140 test — moderate, regression) -------
+  mutation:
+    n_jobs:              20
+    rf_n_estimators:     300
+    rf_max_depth:        12
+    rf_min_samples_leaf: 5
+    rf_max_features:     sqrt
+    gbt_n_estimators:    300
+    gbt_max_depth:       5
+    gbt_learning_rate:   0.1
+    dt_max_depth:        10
+    dt_min_samples_leaf: 10
+    svm_C:               10
+    svm_epsilon:         0.1
+
+  # --- disc_binder classification (18.5k train, 4.6k test — large) ----------
+  disc_binder:
+    n_jobs:              20
+    rf_n_estimators:     500
+    rf_max_depth:        15
+    rf_min_samples_leaf: 5
+    rf_max_features:     sqrt
+    gbt_n_estimators:    500
+    gbt_max_depth:       6
+    gbt_learning_rate:   0.1
+    dt_max_depth:        15
+    dt_min_samples_leaf: 20
+    svm_C:               1        # more regularization for large dataset

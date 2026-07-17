@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# pdb related files
+*.cif
+# PDB files
+*.pdb
+
+# yaml folder
+model_configs/for_multirun/

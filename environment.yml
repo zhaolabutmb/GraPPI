@@ -1,0 +1,42 @@
+name: GraPPI
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - pandas==3.0.2
+      - biopython==1.87
+      - tqdm==4.67.3
+      - openpyxl==3.1.5
+      - matplotlib==3.10.8
+      - seaborn==0.13.2
+      - scikit-learn==1.8.0
+      - numpy==2.4.3
+      - networkx==3.6.1
+      - PyYAML==6.0.3
+      # Official PyTorch release (CUDA 12.8)
+      - torch==2.7.1+cu128
+      - torchvision==0.22.1+cu128
+      - torchaudio==2.7.1+cu128
+      # PyTorch Geometric and dependencies
+      - torch-geometric==2.7.0
+      - pyg-lib==0.5.0+pt27cu128
+      - torch-scatter==2.1.2+pt27cu128
+      - torch-sparse==0.6.18+pt27cu128
+      - torch-cluster==1.6.3+pt27cu128
+      # torch-spline-conv omitted: no prebuilt wheel for pt27cu128, not used in codebase
+
+# Installation instructions (for reference):
+# 1. Create and activate environment:
+#    conda create -n GraPPI python=3.12
+#    conda activate GraPPI
+#    conda install -c bioconda usalign
+# 2. Install packages:
+#    pip install pandas biopython tqdm openpyxl matplotlib seaborn numpy networkx PyYAML
+#    pip install -U scikit-learn
+#    pip install torch==2.7.1+cu128 torchvision==0.22.1+cu128 torchaudio==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128
+#    pip install torch_geometric
+#    pip install pyg_lib torch_scatter torch_sparse torch_cluster -f https://data.pyg.org/whl/torch-2.7.1+cu128.html
+# 3. Run with full Python path to bypass conda activation issues in nohup:
+#    nohup /path/to/miniconda3/envs/GraPPI/bin/python train_unified.py -config model_configs/config_ssl.yaml > train_unified.out 2>&1 &

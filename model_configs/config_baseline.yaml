@@ -1,0 +1,124 @@
+# Baseline Testing Configuration
+# Runs raw-feature (25-dim, no encoder) MLP + sklearn ML models for three tasks:
+#   - delta-G regression (K-fold CV, splits from split_source_dir)
+#   - delta-delta-G / mutant-delta-G regression (seeded GroupKFold by PDB)
+#   - Discriminative binder classification (single split from split_source_dir)
+#
+# split_source_dir is still needed for dG and disc_binder tasks.
+# ddG uses seeded_group_kfold (seed from system.seed, n_folds below).
+#
+# Usage:
+#   python train_unified.py -config model_configs/config_baseline.yaml
+
+# =============================================================================
+# TRAINING PHASES
+# =============================================================================
+training_task:
+  - baseline
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+system:
+  cuda_id: 1
+  seed: 42
+
+# =============================================================================
+# DATA SETTINGS
+# =============================================================================
+data:
+  pdb_root:  ../../GraPPI_data/curated_db
+  dist:      "8"    # Distance threshold used when building graphs (A)
+  # embedding_type is always forced to 'base' internally - no need to change
+  min_nodes: 5      # Minimum nodes per chain for filtering
+
+# =============================================================================
+# BASELINE SETTINGS
+# =============================================================================
+baseline:
+  # -- Which task(s) to run --------------------------------------------------
+  # task: dG | ddG | binder_cls (alias of disc_binder) | all   (default: all)
+  task: binder_cls
+
+  # -- Split source ----------------------------------------------------------
+  # Directory containing *fold_splits.json files from a prior finetune run.
+  # Used by dG and disc_binder tasks (ddG uses seeded_group_kfold instead).
+  split_source_dir: ../../GraPPI_data/trained_data_ssl_finetune/5layers_10hdim_jkmean
+
+  # -- Number of folds for ddG seeded GroupKFold ----------------------------
+  n_folds: 5
+  fold_strategy: random   # or 'group'
+
+  # -- Disc-binder N-fold CV (leakage-aware) --------------------------------
+  # Set cv_split_mode to enable N-fold CV for the disc_binder task (reuses
+  # n_folds above). Omit / set to null to keep the single train/test split.
+  # The CV reads the finetune fold-split file from split_source_dir so folds
+  # and seen/unseen flags match the finetune model exactly.
+  cv_split_mode: fixed_pos      # null | global | fixed_pos
+  cls_metric:    auc # NN early-stop / primary metric: auc | auprc | auc_unseen | auprc_unseen
+
+  # -- Where to write checkpoints + result JSONs ----------------------------
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/baseline
+
+  # -- NN architecture ------------------------------------------------------
+  hidden_dim_power: 9     # MLP hidden size = 2^9 = 512
+  dropout:          0.2
+
+  # -- NN training ----------------------------------------------------------
+  batch_size:        50
+  n_epochs:          1000
+  patience:          30
+  lr:                1.0e-4
+  weight_decay:      1.0e-4
+  loss_fun:          logcosh
+  gamma:             1.0
+  delta:             1.0
+  clip_max_norm:     5.0
+  scheduler_t0:      10
+  scheduler_t_mult:  2
+  scheduler_eta_min: 1.0e-6
+
+  # -- Misc -----------------------------------------------------------------
+  premium_threshold: 1.1  # Used for disc_binder sample_type labelling
+
+  # -- Per-task ML hyper-parameters -----------------------------------------
+  dG:
+    n_jobs:              20
+    rf_n_estimators:     300
+    rf_max_depth:        10
+    rf_min_samples_leaf: 10
+    rf_max_features:     sqrt
+    gbt_n_estimators:    200
+    gbt_max_depth:       4
+    gbt_learning_rate:   0.05
+    dt_max_depth:        8
+    dt_min_samples_leaf: 15
+    svm_C:               10
+    svm_epsilon:         0.1
+
+  ddG:
+    n_jobs:              20
+    rf_n_estimators:     300
+    rf_max_depth:        12
+    rf_min_samples_leaf: 5
+    rf_max_features:     sqrt
+    gbt_n_estimators:    300
+    gbt_max_depth:       5
+    gbt_learning_rate:   0.1
+    dt_max_depth:        10
+    dt_min_samples_leaf: 10
+    svm_C:               10
+    svm_epsilon:         0.1
+
+  disc_binder:
+    n_jobs:              20
+    rf_n_estimators:     500
+    rf_max_depth:        15
+    rf_min_samples_leaf: 5
+    rf_max_features:     sqrt
+    gbt_n_estimators:    500
+    gbt_max_depth:       6
+    gbt_learning_rate:   0.1
+    dt_max_depth:        15
+    dt_min_samples_leaf: 20
+    svm_C:               1

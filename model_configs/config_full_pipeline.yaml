@@ -1,0 +1,210 @@
+# Unified Training Configuration for SSL Pre-training + Fine-tuning
+# This config file controls both phases of the training pipeline
+
+# =============================================================================
+# TRAINING PHASES
+# =============================================================================
+# Specify which phases to run: ['ssl', 'dg_reg', 'mutation', 'disc_binder'] or just some of them
+training_task:
+  #- ssl          # Self-supervised pre-training phase
+  #- dg_reg        # dG finetune with 5-fold CV and test phase
+  #- mutation      # Mutation 5-fold CV fine-tuning and testing phase
+  - disc_binder   # Discriminative binder classification testing phase
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+system:
+  cuda_id: 1
+  seed: 42
+
+# =============================================================================
+# DATA SETTINGS
+# =============================================================================
+data:
+  pdb_root: ../../GraPPI_data/curated_db
+  dist: "8"  # Distance threshold for graph construction (8A)
+  embedding_type: base  # Options: base, esm; will be overwritten by loaded checkpoint if available
+  min_nodes: 5  # Minimum number of nodes per chain
+  
+
+# =============================================================================
+# SSL PRE-TRAINING SETTINGS
+# =============================================================================
+ssl:
+  # Task settings
+  edge_mask_ratio: 0.25
+  use_intra_edges: True
+  intra_edge_mask_ratio: 0.15  # Fraction of interface-adjacent intra-edges to mask
+  intra_edge_beta: 0.65  # Loss = beta * L_inter + (1-beta) * L_intra
+  negative_ratio: 1.0
+  min_interface_edges: 5
+  strategy_type: dynamic # Options: dynamic, stratified, curriculum, hard_negative
+
+  # Model architecture
+  num_layers: 2
+  hidden_dim_power: 7  # Hidden dim = 2^10 = 1024
+  hgt_heads: 4
+  dropout: 0.2
+  message_style: gated_src # Options: gated_src, additive
+
+  use_checkpoint: True
+
+  # Training hyperparameters
+  batch_size: 35
+  n_epochs: 1000
+  lr: 0.0001
+  weight_decay: 0.001
+  clip_max_norm: 5.0
+  patience: 50
+  scheduler_t0: 10
+
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+# =============================================================================
+# SIMPLE TEST FINE-TUNING SETTINGS (Quick testing with cross-attention)
+# =============================================================================
+dg_reg:
+  # Task settings
+  regressor_layers: 3  # Number of layers in regression head
+  ft_hdim: 512  # Hidden dimension for finetuning heads (can be different from SSL phase)
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/6layers_7hdim/ssl_edge_best.pt # Set to your pretrained checkpoint path
+  
+  # Encoder freezing - DEFAULT: Keep encoder frozen for cross-attn testing
+  freeze_encoder: True
+  freeze_epochs: 1000    # Effectively always frozen
+  
+  # Model architecture (auto-loaded from SSL config if pretrained_path exists)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  dropout: 0.3
+  use_checkpoint: True
+  message_style: null # Options: gated_src, additive
+
+  pool_mode: cross_attn # Options: "cross_attn" "attn", "mean", "max", "attn+mean", "attn+max", "attn+mean+max"
+  # Jumping Knowledge (JK-Net) — aggregate intermediate HGT layer outputs
+  use_jk: True           # Set to True to enable JK-Net
+  jk_mode: mean           # Options: sum, mean, max, concat
+  # CROSS-ATTENTION AGGREGATION - Key difference from regular finetune
+  cross_attn_queries: 2         # Number of learnable query vectors
+  cross_attn_heads: 4           # Number of attention heads
+
+  # Loss function
+  loss_fun: logcosh  # Options: mse, logcosh, balanced (for regression); cross_entropy for classification
+  gamma: 1.0
+  delta: 1.0
+  
+  # Training hyperparameters
+  batch_size: 30
+  n_epochs: 1000
+  lr: 0.0005  # Higher LR since only training aggregator + heads
+  weight_decay: 0.005
+  clip_max_norm: 5.0
+  patience: 50  # Shorter patience for quick testing
+  
+  # Scheduler
+  scheduler_t0: 10
+  scheduler_t_mult: 2
+  scheduler_eta_min: 1e-6
+  
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+
+# =============================================================================
+# MUTATION FINE-TUNING SETTINGS (Mutation samples)
+# =============================================================================
+mutation:
+  # Pretrained model path (REQUIRED)
+  # Will be set automatically from SSL phase if 'ssl' is in training_phases, or specify manually
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/6layers_7hdim/ssl_edge_best.pt # need to be specified
+  regressor_layers: 3           # Number of regressor layers
+  ft_hdim: 512
+  # Encoder freezing
+  freeze_encoder: True
+  freeze_epochs: 1000  # Freeze encoder for first N epochs
+  
+  # Model architecture (auto-loaded from SSL config if pretrained_path exists)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  dropout: 0.3
+  use_checkpoint: True
+  message_style: null # Options: gated_src, additive
+  pool_mode: cross_attn # Options: "attn", "mean", "max", "attn+mean", "attn+max", "attn+mean+max"
+  # Jumping Knowledge (JK-Net) — aggregate intermediate HGT layer outputs
+  use_jk: True           # Set to True to enable JK-Net
+  jk_mode: mean           # Options: sum, mean, max, concat
+  # CROSS-ATTENTION AGGREGATION - Key difference from regular finetune
+  cross_attn_queries: 4         # Number of learnable query vectors
+  cross_attn_heads: 2           # Number of attention heads
+  
+  ddg_input_mode: concat_diff  # Options: concat_diff, diff
+  
+  # Training hyperparameters
+  batch_size: 40
+  n_epochs: 1000
+  lr: 0.0001
+  weight_decay: 0.005
+  clip_max_norm: 5.0
+  patience: 50
+  
+  # Learning rate scheduler (CosineAnnealingWarmRestarts)
+  scheduler_t0: 10          # Initial restart period
+  scheduler_t_mult: 2       # Multiplication factor for restart period after each restart
+  scheduler_eta_min: 1e-6   # Minimum learning rate
+  
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
+
+
+# =============================================================================
+# DISC_BINDER FINETUNING SETTINGS
+# =============================================================================
+disc_binder:
+  # Task settings
+  classifier_layers: 2  # Number of layers in classifier head
+  ft_hdim: 128
+  pretrained_path: ../../GraPPI_data/trained_data_ssl_finetune/2layers_9hdim/ssl_edge_best.pt # Set to your pretrained checkpoint path
+  
+  # Encoder freezing - DEFAULT: Keep encoder frozen for cross-attn testing
+  freeze_encoder: True
+  freeze_epochs: 1000    # Effectively always frozen
+  
+  # Model architecture (auto-loaded from SSL config if pretrained_path exists)
+  num_layers: null
+  hidden_dim_power: null
+  hgt_heads: 4
+  dropout: 0.6
+  use_checkpoint: True
+  message_style: null # Options: gated_src, additive
+  capri_subsample_ratio: 4  # Subsample CAPRI negatives to balance with positives
+
+  pool_mode: cross_attn # Options: "cross_attn" "attn", "mean", "max", "attn+mean", "attn+max", "attn+mean+max"
+  # Jumping Knowledge (JK-Net) — aggregate intermediate HGT layer outputs
+  use_jk: True           # Set to True to enable JK-Net
+  jk_mode: mean           # Options: sum, mean, max, concat
+  
+  # CROSS-ATTENTION AGGREGATION - Key difference from regular finetune
+  cross_attn_queries: 2         # Number of learnable query vectors
+  cross_attn_heads: 4           # Number of attention heads
+  
+  # Training hyperparameters
+  batch_size: 50
+  n_fold: 5
+  n_epochs: 1000
+  lr: 0.0002  # Higher LR since only training aggregator + heads
+  weight_decay: 0.02
+  clip_max_norm: 5.0
+  label_smoothing: 0.1 
+  patience: 20  # Shorter patience for quick testing
+  
+  # Scheduler
+  scheduler_t0: 10
+  scheduler_t_mult: 2
+  scheduler_eta_min: 1e-6
+  
+  # Save directory
+  save_dir: ../../GraPPI_data/trained_data_ssl_finetune/
