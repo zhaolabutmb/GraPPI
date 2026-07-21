@@ -2,7 +2,7 @@ import os
 import subprocess
 
 def run_foldx(pdb_path, individual_list, 
-              foldx_executable, working_dir, rotabase_location=None):
+              foldx_executable, working_dir):
     """
     Run FoldX BuildModel command
     
@@ -11,12 +11,10 @@ def run_foldx(pdb_path, individual_list,
         individual_list: path to the mutation list file
         foldx_executable: path to foldx executable
         working_dir: directory to run foldx in
-        rotabase_location: path to rotabase; default in the folder of foldx executable
     """
     pdb_path = os.path.abspath(pdb_path)
     individual_list = os.path.abspath(individual_list)
     foldx_executable = os.path.abspath(foldx_executable)
-    rotabase_location = os.path.abspath(rotabase_location) if rotabase_location else os.path.dirname(foldx_executable)+"/rotabase.txt"
     if 'ATLAS' in pdb_path:
         pdb_id = os.path.basename(pdb_path).lower().split()('.')[0]
         pdb_name = pdb_id + '_at' + '.pdb'
@@ -35,7 +33,6 @@ def run_foldx(pdb_path, individual_list,
         '--command=BuildModel',
         f'--pdb={pdb_name}',
         f'--mutant-file={individual_list}',
-        f'--rotabaseLocation={rotabase_location}',
         '--numberOfRuns=1'
     ]
     

@@ -14,9 +14,9 @@ from tqdm import tqdm
 # Path to USALIGN binary (adjust if needed)
 '''
 Usage:
-python IXN2Pdb.py --IXN_csv_file ../../GraPPI_data/ppi_axin_negative_df.csv --base_dir /mnt/poisson/data/ssnegi/tmp_dir/Human1/Seqs/ --aligned_dir ../../GraPPI_data/PDB/preppi_aligned/
+python IXN2Pdb.py --IXN_csv_file ../../GraPPI_data/ppi_axin_negative_df.csv --base_dir path_to_PrePPI_human_db --aligned_dir ../../GraPPI_data/PDB/preppi_aligned/
 '''
-USALIGN_BIN = "/mnt/poisson/data/shares/USALIGN/USALIGN"
+USALIGN_BIN = "path_to_USALIGN"
 
 # Standard 3-letter to 1-letter amino acid mapping (used to filter non-standard residues)
 THREE_TO_ONE = {
