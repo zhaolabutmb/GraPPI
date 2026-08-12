@@ -70,8 +70,8 @@ STANDARD_AA = {
     'SEC', 'PYL',
 }
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # .../EntroPPI/
-PROJECT_DIR = os.path.dirname(SCRIPT_DIR)                 # .../EntroPPI_files/
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # .../GraPPI/
+PROJECT_DIR = os.path.dirname(SCRIPT_DIR)                 # ..
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -157,11 +157,11 @@ def sign_orient_scores(scores, interface_mask):
 
 def resolve_pdb_path(raw_path):
     """Resolve a (possibly relative) PDB path stored in row_of_df['paths']."""
-    # 1. Try relative to script dir (EntroPPI/)
+    # 1. Try relative to script dir (GraPPI/)
     p = os.path.normpath(os.path.join(SCRIPT_DIR, raw_path))
     if os.path.isfile(p):
         return p
-    # 2. Try relative to project dir (EntroPPI_files/)
+    # 2. Try relative to project dir (..)
     p = os.path.normpath(os.path.join(PROJECT_DIR, raw_path))
     if os.path.isfile(p):
         return p
