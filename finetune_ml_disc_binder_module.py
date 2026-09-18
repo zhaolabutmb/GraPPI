@@ -26,7 +26,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 
 from model_collection.FineTuneModels import (
     load_pretrained_encoder, precompute_embeddings,
-    get_pool_input_dim,
+    get_pool_input_dim, build_embedder,
 )
 from utils.Training_modules.common_utils import (
     set_seed, get_sample_type, load_ssl_config,
@@ -173,30 +173,30 @@ def _run_ml_disc_binder_cv(
     print(f"  CV split mode: {cv_split_mode}  |  primary metric: {cls_metric_name}")
 
     # ---------------------------------------------------------------
-    # Load encoder, precompute embeddings for the whole pool, free encoder
+    # Load encoder (GraPPI SSL or sequence student), precompute pool embeddings
     # ---------------------------------------------------------------
     node_in_dim = MODEL_INIT_DIM[embedding_type]
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    encoder_type = test_cfg.get('encoder_type', 'ssl')
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=test_cfg['num_layers'],
         hgt_heads=test_cfg['hgt_heads'],
-        device=device,
         message_style=test_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=batch_size,
+        use_amp=use_amp,
     )
-    encoder.eval()
     print("\n--- Precomputing CV pool embeddings ---")
-    precompute_embeddings(
-        encoder, [s[0] for s in samples], [s[1] for s in samples], device,
-        batch_size=batch_size, embedding_type=embedding_type, esm_dict=None,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
-    del encoder
+    precompute_fn([s[0] for s in samples], [s[1] for s in samples], esm_dict=None)
     torch.cuda.empty_cache()
-    print("Encoder freed from memory.\n")
+    print("Embeddings precomputed.\n")
 
     # ---------------------------------------------------------------
     # Build folds (identical to NN CV) and run ML per fold
@@ -460,19 +460,25 @@ def run_ml_disc_binder_finetuning(
         raise ValueError("No training samples loaded.")
 
     # ---------------------------------------------------------------
-    # Load encoder & precompute embeddings
+    # Load encoder (GraPPI SSL or sequence student) & precompute embeddings
     # ---------------------------------------------------------------
     node_in_dim = MODEL_INIT_DIM[embedding_type]
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    encoder_type = test_cfg.get('encoder_type', 'ssl')
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=test_cfg['num_layers'],
         hgt_heads=test_cfg['hgt_heads'],
-        device=device,
         message_style=test_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=test_cfg['batch_size'],
+        use_amp=use_amp,
     )
 
     train_names = [s[0] for s in train_samples]
@@ -480,26 +486,13 @@ def run_ml_disc_binder_finetuning(
     test_names = [s[0] for s in test_samples]
     test_graphs = [s[1] for s in test_samples]
 
-    encoder.eval()
     print("\n--- Precomputing train embeddings ---")
-    precompute_embeddings(
-        encoder, train_names, train_graphs, device,
-        batch_size=test_cfg['batch_size'],
-        embedding_type=embedding_type, esm_dict=esm_dict,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(train_names, train_graphs, esm_dict=esm_dict)
     print("--- Precomputing test embeddings ---")
-    precompute_embeddings(
-        encoder, test_names, test_graphs, device,
-        batch_size=test_cfg['batch_size'],
-        embedding_type=embedding_type, esm_dict=esm_dict,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(test_names, test_graphs, esm_dict=esm_dict)
 
-    # Free encoder
-    del encoder
     torch.cuda.empty_cache()
-    print("Encoder freed from memory.\n")
+    print("Embeddings precomputed.\n")
 
     # ---------------------------------------------------------------
     # Mean-pool → numpy features

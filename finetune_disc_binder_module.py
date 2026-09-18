@@ -16,7 +16,7 @@ from torch_geometric.loader import DataLoader
 
 from model_collection.FineTuneModels import (
     load_pretrained_encoder, precompute_embeddings,
-    get_pool_input_dim, create_poolhead_model,
+    get_pool_input_dim, create_poolhead_model, build_embedder,
 )
 from utils.Training_modules.save_training import FineTuneEarlyStopping
 from utils.Training_modules.common_utils import (
@@ -42,10 +42,16 @@ def _load_ssl_pos_split(pretrained_path: str) -> Tuple[Set[str], Set[str]]:
     ssl_dir = os.path.dirname(pretrained_path) if os.path.isfile(pretrained_path) else pretrained_path
     split_path = os.path.join(ssl_dir, 'ssl_train_val_split.json')
     if not os.path.exists(split_path):
-        raise FileNotFoundError(
-            f"ssl_train_val_split.json not found at {split_path}. "
-            "Required to identify seen/unseen positives for disc_binder CV."
-        )
+        # Student checkpoints store the split under a different name (same
+        # seed-42 split on the same positive set as SSL).
+        student_split = os.path.join(ssl_dir, 'student_train_val_split.json')
+        if os.path.exists(student_split):
+            split_path = student_split
+        else:
+            raise FileNotFoundError(
+                f"ssl_train_val_split.json not found at {split_path}. "
+                "Required to identify seen/unseen positives for disc_binder CV."
+            )
     with open(split_path, 'r') as f:
         ssl_split = json.load(f)
     seen = set(n.lower() for n in ssl_split['train_names'])
@@ -231,40 +237,34 @@ def _run_disc_binder_cv(
     print(f"  CV split mode: {cv_split_mode}")
 
     # ---------------------------------------------------------------
-    # 2. Load pretrained encoder (frozen) and precompute embeddings
+    # 2. Load encoder (GraPPI SSL or sequence student) and precompute embeddings
     # ---------------------------------------------------------------
+    encoder_type = test_cfg.get('encoder_type', 'ssl')
     node_in_dim = MODEL_INIT_DIM[embedding_type]
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=test_cfg['num_layers'],
         hgt_heads=test_cfg['hgt_heads'],
-        device=device,
         message_style=test_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=batch_size,
+        use_amp=use_amp,
     )
-    encoder_params = sum(p.numel() for p in encoder.parameters())
-    print(f"Encoder parameters (frozen): {encoder_params:,}")
 
     pool_names = [s[0] for s in samples]
     pool_graphs = [s[1] for s in samples]
-    encoder.eval()
     print("\n--- Precomputing CV pool embeddings ---")
-    precompute_embeddings(
-        encoder, pool_names, pool_graphs, device,
-        batch_size=batch_size,
-        embedding_type=embedding_type,
-        esm_dict=None,
-        use_amp=use_amp,
-        use_jk=use_jk,
-        jk_mode=jk_mode,
-    )
+    precompute_fn(pool_names, pool_graphs, esm_dict=None)
 
-    del encoder
     torch.cuda.empty_cache()
-    print("Encoder freed from memory. Training with precomputed embeddings.\n")
+    print("Embeddings precomputed. Training with precomputed embeddings.\n")
 
     # ---------------------------------------------------------------
     # 3. Fold splits per cv_split_mode
@@ -681,7 +681,7 @@ def run_disc_binder_finetuning(
     local_dir = (
         f"{test_cfg['num_layers']}layers_{test_cfg['hidden_dim_power']}hdim"
         + (f'_{embedding_type}' if embedding_type in ['esm', 'esm480'] else '')
-        + (f"_{test_cfg['strategy_type']}" if test_cfg['strategy_type'] != 'dynamic' else '')
+        + (f"_{test_cfg.get('strategy_type', 'dynamic')}" if test_cfg.get('strategy_type', 'dynamic') != 'dynamic' else '')
         + (f"_additive" if test_cfg.get('message_style', 'gated_src') == 'additive' else '')
     )
     # JK-Net config

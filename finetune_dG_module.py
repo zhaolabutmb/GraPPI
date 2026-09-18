@@ -15,7 +15,7 @@ from torch_geometric.loader import DataLoader
 
 from model_collection.FineTuneModels import (
     load_pretrained_encoder, precompute_embeddings,
-    get_pool_input_dim, create_poolhead_model,
+    get_pool_input_dim, create_poolhead_model, build_embedder,
 )
 from utils.Training_modules.save_training import FineTuneEarlyStopping
 from utils.Quantity_compute.Loss_fun import get_loss
@@ -102,6 +102,7 @@ def run_dG_finetuning(config: Dict, device: torch.device, ssl_checkpoint_path: O
     # Setup directories
     # ---------------------------------------------------------------
     embedding_type = data_cfg['embedding_type']
+    encoder_type = finetune_cfg.get('encoder_type', 'ssl')
     local_dir = (
         f"{finetune_cfg['num_layers']}layers_{finetune_cfg['hidden_dim_power']}hdim"
         + (f'_{embedding_type}' if embedding_type in ['esm', 'esm480'] else '')
@@ -201,60 +202,44 @@ def run_dG_finetuning(config: Dict, device: torch.device, ssl_checkpoint_path: O
         raise ValueError("No test samples loaded.")
 
     # ---------------------------------------------------------------
-    # Load pretrained encoder (frozen, eval mode) & precompute embeddings
+    # Load encoder (GraPPI SSL or sequence student) & precompute embeddings
     # ---------------------------------------------------------------
     node_in_dim = MODEL_INIT_DIM[embedding_type]
 
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=finetune_cfg['num_layers'],
         hgt_heads=finetune_cfg['hgt_heads'],
-        device=device,
         message_style=finetune_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=finetune_cfg['batch_size'],
+        use_amp=use_amp,
     )
-
-    encoder_params = sum(p.numel() for p in encoder.parameters())
-    print(f"Encoder parameters (frozen): {encoder_params:,}")
 
     # Precompute embeddings for CV samples
     all_names = [s[0] for s in all_samples]
     all_graphs = [s[1] for s in all_samples]
-    encoder.eval()
     print("\n--- Precomputing CV embeddings ---")
-    precompute_embeddings(
-        encoder, all_names, all_graphs, device,
-        batch_size=finetune_cfg['batch_size'],
-        embedding_type=embedding_type,
-        esm_dict=esm_dict,
-        use_amp=use_amp,
-        use_jk=use_jk,
-        jk_mode=jk_mode,
-    )
+    precompute_fn(all_names, all_graphs, esm_dict=esm_dict)
 
     # Precompute embeddings for test samples
     test_names = [s[0] for s in test_samples]
     test_graphs = [s[1] for s in test_samples]
     print("--- Precomputing test embeddings ---")
-    precompute_embeddings(
-        encoder, test_names, test_graphs, device,
-        batch_size=finetune_cfg['batch_size'],
-        embedding_type=embedding_type,
-        esm_dict=esm_dict,
-        use_amp=use_amp,
-        use_jk=use_jk,
-        jk_mode=jk_mode,
-    )
+    precompute_fn(test_names, test_graphs, esm_dict=esm_dict)
 
-    # Free encoder and ESM dict from memory
-    del encoder
+    # Free ESM dict from memory
     if esm_dict is not None:
         del esm_dict
     torch.cuda.empty_cache()
-    print("Encoder freed from memory. Training with precomputed embeddings.\n")
+    print("Embeddings precomputed. Training with precomputed embeddings.\n")
 
     # ---------------------------------------------------------------
     # Create test loader (shared across folds)

@@ -330,6 +330,277 @@ def precompute_embeddings(
 
 
 # ============================================================================
+# Student encoder (sequence) — drop-in replacement for the GraPPI encoder
+# ============================================================================
+def load_student_encoder(checkpoint_path: str, device: torch.device):
+    """
+    Load a trained sequence-student encoder (frozen, eval mode).
+
+    Expects `student_config.json` alongside the checkpoint describing the
+    architecture. Returns (student, student_cfg).
+    """
+    import json
+    import os
+    from model_collection.StudentModels import create_student_model
+
+    cfg_path = os.path.join(os.path.dirname(checkpoint_path), 'student_config.json')
+    if not os.path.exists(cfg_path):
+        raise FileNotFoundError(
+            f"student_config.json not found at {cfg_path}; required to rebuild the "
+            "student architecture.")
+    with open(cfg_path, 'r') as f:
+        scfg = json.load(f)
+
+    student = create_student_model(
+        esm_dim=scfg['esm_dim'],
+        hidden_dim=scfg['hidden_dim'],
+        n_blocks=scfg['n_blocks'],
+        n_heads=scfg['n_heads'],
+        dropout=scfg.get('dropout', 0.0),
+        ffn_mult=scfg.get('ffn_mult', 4),
+    )
+    state = torch.load(checkpoint_path, map_location='cpu')
+    if isinstance(state, dict) and 'model_state_dict' in state:
+        state = state['model_state_dict']
+    student.load_state_dict(state)
+    student = student.to(device)
+    student.eval()
+    for p in student.parameters():
+        p.requires_grad = False
+    print(f"Loaded student encoder from {checkpoint_path} "
+          f"(esm_dim={scfg['esm_dim']}, hidden_dim={scfg['hidden_dim']}, "
+          f"n_blocks={scfg['n_blocks']})")
+    return student, scfg
+
+
+@torch.no_grad()
+def precompute_embeddings_student(
+    student,
+    esm_dim: int,
+    sample_names: List[str],
+    graphs: List,
+    device: torch.device,
+    batch_size: int = 16,
+    use_amp: bool = True,
+) -> List:
+    """
+    Run the sequence student on each complex's ESM residue embeddings and store
+    the resulting per-node embeddings into graph[nt].x — mirroring the output
+    contract of precompute_embeddings so downstream pool+head code is unchanged.
+
+    The student consumes only x[:, :esm_dim] per protein (no edges). No residue
+    cap is applied here (inference must cover all lengths).
+    """
+    from utils.Training_modules.student_data_loader import pad_and_mask
+
+    print(f"\nPrecomputing STUDENT embeddings for {len(graphs)} graphs...")
+    if graphs and graphs[0]['receptor'].x.size(1) < esm_dim:
+        raise ValueError(
+            f"Graph node features have {graphs[0]['receptor'].x.size(1)} dims but the "
+            f"student needs esm_dim={esm_dim}. Use an ESM graph set (embedding_type "
+            "'esm'/'esm480') matching the student.")
+
+    amp_ctx = (torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16)
+               if (use_amp and device.type == 'cuda') else nullcontext())
+    student.eval()
+
+    for start in tqdm(range(0, len(graphs), batch_size), desc="Student encoding"):
+        chunk = graphs[start:start + batch_size]
+        recs = [g['receptor'].x[:, :esm_dim].float() for g in chunk]
+        ligs = [g['ligand'].x[:, :esm_dim].float() for g in chunk]
+        rec_x, rec_mask = pad_and_mask(recs)
+        lig_x, lig_mask = pad_and_mask(ligs)
+        rec_x, lig_x = rec_x.to(device), lig_x.to(device)
+        rec_mask, lig_mask = rec_mask.to(device), lig_mask.to(device)
+
+        with amp_ctx:
+            s_rec, s_lig = student(rec_x, lig_x, rec_mask, lig_mask)
+        s_rec = s_rec.float().cpu()
+        s_lig = s_lig.float().cpu()
+
+        for i, g in enumerate(chunk):
+            n_rec = recs[i].size(0)
+            n_lig = ligs[i].size(0)
+            g['receptor'].x = s_rec[i, :n_rec]
+            g['ligand'].x = s_lig[i, :n_lig]
+
+    sample_graph = graphs[0]
+    print(f"Precomputed student embedding dims: "
+          f"receptor={sample_graph['receptor'].x.shape[-1]}, "
+          f"ligand={sample_graph['ligand'].x.shape[-1]}")
+    return graphs
+
+
+# ============================================================================
+# Structure student encoder (individual monomer graphs) — drop-in replacement
+# ============================================================================
+def load_structure_student_encoder(checkpoint_path: str, device: torch.device):
+    """
+    Load a trained structure-student encoder (frozen, eval mode).
+
+    Expects `structure_student_config.json` alongside the checkpoint. Returns
+    (student, student_cfg).
+    """
+    import json
+    import os
+    from model_collection.StructureStudentModels import create_structure_student_model
+
+    cfg_path = os.path.join(os.path.dirname(checkpoint_path), 'structure_student_config.json')
+    if not os.path.exists(cfg_path):
+        raise FileNotFoundError(
+            f"structure_student_config.json not found at {cfg_path}; required to "
+            "rebuild the student architecture.")
+    with open(cfg_path, 'r') as f:
+        scfg = json.load(f)
+
+    student = create_structure_student_model(
+        node_in_dim=scfg['node_in_dim'],
+        edge_in_dim=scfg['edge_in_dim'],
+        hidden_dim=scfg['hidden_dim'],
+        n_gnn_layers=scfg['n_gnn_layers'],
+        gnn_heads=scfg.get('gnn_heads', 4),
+        n_cross_blocks=scfg['n_cross_blocks'],
+        n_heads=scfg['n_heads'],
+        dropout=scfg.get('dropout', 0.0),
+        ffn_mult=scfg.get('ffn_mult', 4),
+    )
+    state = torch.load(checkpoint_path, map_location='cpu')
+    if isinstance(state, dict) and 'model_state_dict' in state:
+        state = state['model_state_dict']
+    student.load_state_dict(state)
+    student = student.to(device)
+    student.eval()
+    for p in student.parameters():
+        p.requires_grad = False
+    print(f"Loaded structure student encoder from {checkpoint_path} "
+          f"(node_in_dim={scfg['node_in_dim']}, hidden_dim={scfg['hidden_dim']}, "
+          f"n_gnn_layers={scfg['n_gnn_layers']}, n_cross_blocks={scfg['n_cross_blocks']})")
+    return student, scfg
+
+
+@torch.no_grad()
+def precompute_embeddings_structure_student(
+    student,
+    sample_names: List[str],
+    graphs: List,
+    device: torch.device,
+    batch_size: int = 16,
+    use_amp: bool = True,
+) -> List:
+    """
+    Run the structure student on each complex's two intra-chain homo graphs
+    (sliced in-memory from the complex HeteroData) and store the resulting
+    per-node embeddings into graph[nt].x — mirroring the output contract of
+    precompute_embeddings so downstream pool+head code is unchanged.
+    """
+    from torch_geometric.data import Batch
+    from utils.Training_modules.homo_graph_cache import hetero_to_homo_pair
+
+    print(f"\nPrecomputing STRUCTURE STUDENT embeddings for {len(graphs)} graphs...")
+    amp_ctx = (torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16)
+               if (use_amp and device.type == 'cuda') else nullcontext())
+    student.eval()
+
+    for start in tqdm(range(0, len(graphs), batch_size), desc="Structure student encoding"):
+        chunk = graphs[start:start + batch_size]
+        pairs = [hetero_to_homo_pair(g) for g in chunk]
+        rec_batch = Batch.from_data_list([p['receptor'] for p in pairs]).to(device)
+        lig_batch = Batch.from_data_list([p['ligand'] for p in pairs]).to(device)
+
+        with amp_ctx:
+            s_rec, s_lig, rec_mask, lig_mask = student(rec_batch, lig_batch)
+        s_rec = s_rec.float().cpu()
+        s_lig = s_lig.float().cpu()
+
+        for i, g in enumerate(chunk):
+            n_rec = pairs[i]['receptor'].num_nodes
+            n_lig = pairs[i]['ligand'].num_nodes
+            g['receptor'].x = s_rec[i, :n_rec]
+            g['ligand'].x = s_lig[i, :n_lig]
+
+    sample_graph = graphs[0]
+    print(f"Precomputed structure student embedding dims: "
+          f"receptor={sample_graph['receptor'].x.shape[-1]}, "
+          f"ligand={sample_graph['ligand'].x.shape[-1]}")
+    return graphs
+
+
+def build_embedder(
+    pretrained_path: str,
+    device: torch.device,
+    *,
+    encoder_type: str,
+    embedding_type: str,
+    node_in_dim: int,
+    edge_in_dim: int,
+    metadata: Tuple,
+    hidden_dim: int,
+    num_hgt_layers: int,
+    hgt_heads: int,
+    message_style: str,
+    use_jk: bool,
+    jk_mode: str,
+    batch_size: int,
+    use_amp: bool,
+):
+    """
+    Unified dispatcher for downstream modules. Loads either the GraPPI SSL
+    encoder or the sequence student, and returns:
+
+        (precompute_fn, resolved_hidden_dim, resolved_use_jk)
+
+    where precompute_fn(sample_names, graphs, esm_dict=None) fills graph[nt].x
+    in place with per-node embeddings. For the student, use_jk is always False
+    and hidden_dim is taken from the student checkpoint.
+    """
+    if encoder_type == 'student':
+        student, scfg = load_student_encoder(pretrained_path, device)
+        esm_dim = scfg['esm_dim']
+        h = scfg['hidden_dim']
+
+        def precompute_fn(sample_names, graphs, esm_dict=None):
+            return precompute_embeddings_student(
+                student, esm_dim, sample_names, graphs, device,
+                batch_size=batch_size, use_amp=use_amp,
+            )
+
+        return precompute_fn, h, False
+
+    if encoder_type == 'structure_student':
+        student, scfg = load_structure_student_encoder(pretrained_path, device)
+        h = scfg['hidden_dim']
+
+        def precompute_fn(sample_names, graphs, esm_dict=None):
+            return precompute_embeddings_structure_student(
+                student, sample_names, graphs, device,
+                batch_size=batch_size, use_amp=use_amp,
+            )
+
+        return precompute_fn, h, False
+
+    encoder = load_pretrained_encoder(
+        checkpoint_path=pretrained_path,
+        node_in_dim=node_in_dim,
+        edge_in_dim=edge_in_dim,
+        metadata=metadata,
+        hidden_dim=hidden_dim,
+        num_hgt_layers=num_hgt_layers,
+        hgt_heads=hgt_heads,
+        device=device,
+        message_style=message_style,
+    )
+
+    def precompute_fn(sample_names, graphs, esm_dict=None):
+        return precompute_embeddings(
+            encoder, sample_names, graphs, device,
+            batch_size=batch_size, embedding_type=embedding_type,
+            esm_dict=esm_dict, use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
+        )
+
+    return precompute_fn, hidden_dim, use_jk
+
+
+# ============================================================================
 # Pool + Head Base Class
 # ============================================================================
 

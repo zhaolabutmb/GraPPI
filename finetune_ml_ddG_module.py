@@ -27,7 +27,7 @@ import torch
 
 from model_collection.FineTuneModels import (
     load_pretrained_encoder, precompute_embeddings,
-    get_pool_input_dim,
+    get_pool_input_dim, build_embedder,
 )
 from utils.Training_modules.common_utils import (
     set_seed, load_sttgs_from_dir, load_ssl_config,
@@ -248,31 +248,31 @@ def run_ml_ddG_finetuning(
     test_names = [p[0] for p in test_pairs]
 
     # ---------------------------------------------------------------
-    # Load encoder & precompute embeddings (with WT deduplication)
+    # Load encoder (GraPPI SSL or sequence student) & precompute embeddings
     # ---------------------------------------------------------------
     node_in_dim = MODEL_INIT_DIM[embedding_type]
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    encoder_type = mut_cfg.get('encoder_type', 'ssl')
+    batch_size = mut_cfg['batch_size']
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=mut_cfg['num_layers'],
         hgt_heads=mut_cfg['hgt_heads'],
-        device=device,
         message_style=mut_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=batch_size,
+        use_amp=use_amp,
     )
-
-    encoder.eval()
-    batch_size = mut_cfg['batch_size']
 
     # Train mutant embeddings
     print("\n--- Precomputing train mutant embeddings ---")
-    precompute_embeddings(
-        encoder, train_names, train_mut_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(train_names, train_mut_graphs)
 
     # Train WT embeddings (deduplicated)
     seen_wt_ids = set()
@@ -284,19 +284,11 @@ def run_ml_ddG_finetuning(
             unique_wt_names.append(pdb_id)
             unique_wt_graphs.append(graph)
     print(f"--- Precomputing train WT embeddings ({len(unique_wt_graphs)} unique) ---")
-    precompute_embeddings(
-        encoder, unique_wt_names, unique_wt_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(unique_wt_names, unique_wt_graphs)
 
     # Test mutant embeddings
     print("--- Precomputing test mutant embeddings ---")
-    precompute_embeddings(
-        encoder, test_names, test_mut_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(test_names, test_mut_graphs)
 
     # Test WT embeddings (deduplicated)
     seen_wt_ids_test = set()
@@ -308,16 +300,10 @@ def run_ml_ddG_finetuning(
             unique_test_wt_names.append(pdb_id)
             unique_test_wt_graphs.append(graph)
     print(f"--- Precomputing test WT embeddings ({len(unique_test_wt_graphs)} unique) ---")
-    precompute_embeddings(
-        encoder, unique_test_wt_names, unique_test_wt_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type,
-        use_amp=use_amp, use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(unique_test_wt_names, unique_test_wt_graphs)
 
-    # Free encoder
-    del encoder
     torch.cuda.empty_cache()
-    print("Encoder freed from memory.\n")
+    print("Embeddings precomputed.\n")
 
     # ---------------------------------------------------------------
     # Mean-pool → numpy features for ML

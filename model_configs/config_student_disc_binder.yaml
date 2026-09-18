@@ -1,0 +1,71 @@
+# =============================================================================
+# Student disc_binder (MLP / pool+head classifier) evaluation.
+# Uses the neural cross-attention pool + MLP head (task `disc_binder`), which
+# outperforms the sklearn ML pipeline on this task. Compare against the GraPPI
+# teacher and pure-ESM MLP baselines.
+# =============================================================================
+training_task:
+  - disc_binder
+
+system:
+  cuda_id: 1
+  seed: 42
+
+# -----------------------------------------------------------------------------
+# DATA — student requires ESM graphs
+# -----------------------------------------------------------------------------
+data:
+  pdb_root: ../GraPPI_data/curated_db
+  dist: "8"
+  embedding_type: esm        # student consumes x[:, :1280]
+  min_nodes: 5
+
+# -----------------------------------------------------------------------------
+# DISC_BINDER (pool + MLP head)
+# -----------------------------------------------------------------------------
+disc_binder:
+  encoder_type: student      # 'ssl' (GraPPI) or 'student'
+  pretrained_path: ../GraPPI_data/trained_data_student/student_3blk_16h_esm_from_3layers_10hdim_esm/student_best.pt
+
+  # Architecture fields are IGNORED for encoder_type=student (hidden_dim is read
+  # from student_config.json). Set explicitly so the hidden_dim computation /
+  # save-dir naming don't hit the null auto-detect path.
+  num_layers: 3
+  hidden_dim_power: 10        # 2^10 = 1024 (matches the 3L/1024 teacher)
+  hgt_heads: 4
+  message_style: gated_src
+  strategy_type: dynamic
+
+  freeze_encoder: True
+  freeze_epochs: 1000
+
+  # Head + pooling
+  classifier_layers: 2
+  ft_hdim: 256
+  dropout: 0.4
+  pool_mode: cross_attn      # cross_attn | attn | mean | max | attn+mean | ...
+  cross_attn_queries: 2
+  cross_attn_heads: 4
+  capri_subsample_ratio: 1
+
+  use_jk: False              # student is a final-layer drop-in
+  jk_mode: mean
+
+  # CV / metrics
+  n_folds: 5
+  cv_split_mode: global      # 'global' | 'fixed_pos'
+  cls_metric: auprc_unseen   # auc | auprc | auc_unseen | auprc_unseen
+
+  # Training
+  batch_size: 50
+  n_epochs: 1000
+  lr: 0.0002
+  weight_decay: 0.02
+  clip_max_norm: 5.0
+  label_smoothing: 0.1
+  patience: 20
+  scheduler_t0: 10
+  scheduler_t_mult: 2
+  scheduler_eta_min: 1e-6
+
+  save_dir: ../GraPPI_data/trained_data_student_finetune/

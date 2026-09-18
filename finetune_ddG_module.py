@@ -14,6 +14,7 @@ from torch_geometric.loader import DataLoader
 
 from model_collection.FineTuneModels import (
     load_pretrained_encoder, precompute_embeddings,
+    get_pool_input_dim, create_poolhead_model, build_embedder,
     get_pool_input_dim, create_poolhead_model,
 )
 from utils.Training_modules.save_training import FineTuneEarlyStopping
@@ -263,31 +264,29 @@ def run_ddg_finetuning(config: Dict, device: torch.device, ssl_checkpoint_path: 
     # ---------------------------------------------------------------
     node_in_dim = MODEL_INIT_DIM[embedding_type]
     hidden_dim = 2 ** mut_cfg['hidden_dim_power']
-    
-    encoder = load_pretrained_encoder(
-        checkpoint_path=pretrained_path,
+    encoder_type = mut_cfg.get('encoder_type', 'ssl')
+    batch_size = mut_cfg['batch_size']
+
+    precompute_fn, hidden_dim, use_jk = build_embedder(
+        pretrained_path, device,
+        encoder_type=encoder_type,
+        embedding_type=embedding_type,
         node_in_dim=node_in_dim,
         edge_in_dim=EDGE_IN_DIM,
         metadata=METADATA,
         hidden_dim=hidden_dim,
         num_hgt_layers=mut_cfg['num_layers'],
         hgt_heads=mut_cfg['hgt_heads'],
-        device=device,
         message_style=mut_cfg.get('message_style', 'gated_src'),
+        use_jk=use_jk,
+        jk_mode=jk_mode,
+        batch_size=batch_size,
+        use_amp=use_amp,
     )
-    encoder_params = sum(p.numel() for p in encoder.parameters())
-    print(f"Encoder parameters (frozen): {encoder_params:,}")
-    
-    encoder.eval()
-    batch_size = mut_cfg['batch_size']
-    
+
     # Precompute embeddings for all graph sets
     print("\n--- Precomputing train mutant embeddings ---")
-    precompute_embeddings(
-        encoder, train_names, train_mut_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type, use_amp=use_amp,
-        use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(train_names, train_mut_graphs)
     # Wild-type graphs for training: deduplicate before encoding.
     # Multiple mutants share the same WT graph object — encoding it twice
     # would feed already-overwritten .x back into the encoder.
@@ -300,17 +299,9 @@ def run_ddg_finetuning(config: Dict, device: torch.device, ssl_checkpoint_path: 
             unique_wt_names.append(pdb_id)
             unique_wt_graphs.append(graph)
     print(f"--- Precomputing train wild-type embeddings ({len(unique_wt_graphs)} unique of {len(train_wt_graphs)} total) ---")
-    precompute_embeddings(
-        encoder, unique_wt_names, unique_wt_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type, use_amp=use_amp,
-        use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(unique_wt_names, unique_wt_graphs)
     print("--- Precomputing test mutant embeddings ---")
-    precompute_embeddings(
-        encoder, test_names, test_mut_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type, use_amp=use_amp,
-        use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(test_names, test_mut_graphs)
     # Same deduplication for test wild-type graphs
     seen_wt_ids_test = set()
     unique_test_wt_names, unique_test_wt_graphs = [], []
@@ -321,16 +312,10 @@ def run_ddg_finetuning(config: Dict, device: torch.device, ssl_checkpoint_path: 
             unique_test_wt_names.append(pdb_id)
             unique_test_wt_graphs.append(graph)
     print(f"--- Precomputing test wild-type embeddings ({len(unique_test_wt_graphs)} unique of {len(test_wt_graphs)} total) ---")
-    precompute_embeddings(
-        encoder, unique_test_wt_names, unique_test_wt_graphs, device,
-        batch_size=batch_size, embedding_type=embedding_type, use_amp=use_amp,
-        use_jk=use_jk, jk_mode=jk_mode,
-    )
+    precompute_fn(unique_test_wt_names, unique_test_wt_graphs)
     
-    # Free encoder
-    del encoder
     torch.cuda.empty_cache()
-    print("Encoder freed from memory. Training with precomputed embeddings.\n")
+    print("Embeddings precomputed. Training with precomputed embeddings.\n")
     
     # ---------------------------------------------------------------
     # N-fold cross-validation

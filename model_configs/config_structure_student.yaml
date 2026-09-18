@@ -1,0 +1,73 @@
+training_task:
+  - structure_student   # Structure-student knowledge distillation (variant 2-1)
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+system:
+  cuda_id: 0
+  seed: 42
+
+# =============================================================================
+# DATA SETTINGS
+# =============================================================================
+data:
+  pdb_root: ../GraPPI_data/curated_db
+  dist: "8"                 # Distance threshold for graph construction (8A)
+  embedding_type: esm      # 'base' (25-dim) recommended; 'esm'/'esm480' also supported
+  min_nodes: 5
+  split_seed: 42            # 80/20 train/val split, mirrors SSL
+
+# =============================================================================
+# STRUCTURE STUDENT DISTILLATION SETTINGS
+# =============================================================================
+structure_student:
+  # --- Teacher (frozen GraPPI) ---
+  # Its architecture is read from ssl_edge_config.json in the same directory;
+  # the student hidden_dim is taken from the teacher so it stays a drop-in.
+  teacher_ckpt: ../GraPPI_data/trained_data_ssl_finetune/6layers_9hdim_esm/ssl_edge_best.pt
+  teacher_cache_dir: ../GraPPI_data/student_teacher_cache/
+  teacher_batch_size: 16
+  min_interface_edges: 5
+
+  # --- Homo graph cache (hetero -> per-protein homo graphs, built once) ---
+  homo_cache_dir: ../GraPPI_data/structure_student_homo_cache/
+
+  # --- Data caps ---
+  max_residues_per_protein: 1000   # per-protein training cap (2000 total/complex)
+
+  # --- Augmentation ---
+  swap_augment: true               # role-swap augmentation (shares swapped teacher targets)
+
+  # --- Student architecture ---
+  n_gnn_layers: 1      # GATv2 layers per protein tower (shared weights, edge_dim=8)
+  gnn_heads: 4          # GATv2 attention heads (averaged, output stays hidden_dim)
+  n_cross_blocks: 3    # cross-attention blocks exchanging receptor/ligand context
+  n_heads: 16
+  dropout: 0.3
+  ffn_mult: 4
+  # hidden_dim is inherited from the teacher checkpoint (not set here)
+
+  # --- Distillation loss ---
+  mse_weight: 1.0
+  cosine_weight: 1.0
+
+  # --- Edge-level distillation (interface contact prediction) ---
+  edge_loss_weight: 1.0       # 0 disables (embedding-only, original behavior)
+  edge_negative_ratio: 1.0    # negatives sampled per positive contact
+  edge_dropout: 0.1
+  # edge_hidden: null         # edge head hidden dim (defaults to hidden_dim)
+
+  # --- Training ---
+  batch_size: 16
+  num_workers: 4
+  n_epochs: 1000
+  lr: 0.0003
+  weight_decay: 0.01
+  clip_max_norm: 5.0
+  patience: 50
+  scheduler_t0: 10
+  scheduler_t_mult: 2
+
+  # --- Save directory ---
+  save_dir: ../GraPPI_data/trained_data_structure_student/

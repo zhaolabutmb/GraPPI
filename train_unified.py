@@ -4,6 +4,8 @@ from typing import Dict
 import torch
 from utils.Training_modules.common_utils import set_seed
 from SSL_train_module import run_ssl_pretraining
+from student_train_module import run_student_training
+from structure_student_train_module import run_structure_student_training
 from finetune_dG_module import run_dG_finetuning
 from finetune_disc_binder_module import run_disc_binder_finetuning
 from finetune_ddG_module import run_ddg_finetuning
@@ -60,6 +62,12 @@ def main():
     
     if 'ssl' in config['training_task']:
         ssl_checkpoint_path = run_ssl_pretraining(config, device)
+    
+    if 'student' in config['training_task']:
+        run_student_training(config, device)
+    
+    if 'structure_student' in config['training_task']:
+        run_structure_student_training(config, device)
     
     if 'dg_reg' in config['training_task']:
         run_dG_finetuning(config, device, ssl_checkpoint_path)

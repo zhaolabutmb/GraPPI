@@ -186,10 +186,16 @@ def load_ssl_pos_split(pretrained_path: str) -> Tuple[Set[str], Set[str]]:
     ssl_dir = os.path.dirname(pretrained_path) if os.path.isfile(pretrained_path) else pretrained_path
     split_path = os.path.join(ssl_dir, 'ssl_train_val_split.json')
     if not os.path.exists(split_path):
-        raise FileNotFoundError(
-            f"ssl_train_val_split.json not found at {split_path}. "
-            "Required to identify seen/unseen positives for disc_binder CV."
-        )
+        # Student checkpoints store the split under a different name (same
+        # seed-42 split on the same positive set as SSL).
+        student_split = os.path.join(ssl_dir, 'student_train_val_split.json')
+        if os.path.exists(student_split):
+            split_path = student_split
+        else:
+            raise FileNotFoundError(
+                f"ssl_train_val_split.json not found at {split_path}. "
+                "Required to identify seen/unseen positives for disc_binder CV."
+            )
     with open(split_path, 'r') as f:
         ssl_split = json.load(f)
     seen = set(n.lower() for n in ssl_split['train_names'])
