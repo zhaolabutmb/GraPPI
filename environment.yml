@@ -26,6 +26,8 @@ dependencies:
       - torch-sparse==0.6.18+pt27cu128
       - torch-cluster==1.6.3+pt27cu128
       # torch-spline-conv omitted: no prebuilt wheel for pt27cu128, not used in codebase
+      # Required by GraPPI.py inference CLI for esm/esm480 embedding types
+      - fair-esm==2.0.0
 
 # Installation instructions (for reference):
 # 1. Create and activate environment:

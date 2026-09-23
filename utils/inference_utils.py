@@ -2,6 +2,7 @@ import os
 import json
 import pickle
 
+import pandas as pd
 import torch
 import numpy as np
 from torch_geometric.loader import DataLoader
@@ -18,6 +19,21 @@ from utils.Training_modules.common_utils import (
     METADATA,
     filter_samples_finetune,
 )
+from utils.gen_graphs_unified import (
+    create_hetero_graph_safe,
+    NoInterfaceError,
+    OversizedError,
+    StructureToHeteroGraph,
+)
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_AA_FEATURE_PATH = os.path.join(REPO_ROOT, 'stored_data', 'AA_At_dict.json')
+
+# fair-esm model names, keyed by per-residue embedding dimension
+ESM_MODEL_LOADERS = {
+    1280: 'esm2_t33_650M_UR50D',
+    480: 'esm2_t12_35M_UR50D',
+}
 
 
 # ---------------------------------------------------------------------------
@@ -59,18 +75,273 @@ def load_ssl_encoder_config(ssl_dir):
     return cfg['hgt_heads'], cfg['dropout'], cfg['message_style']
 
 
+def select_best_fold_by_key(summary_path, score_key='fold_test_rp'):
+    """Pick the fold that maximizes ``summary[score_key]`` in a fold-summary JSON.
+
+    Returns (best_fold_num, best_score, summary_dict).
+    """
+    summary = json.load(open(summary_path))
+    scores = summary[score_key]
+    best_key = max(scores, key=scores.get)
+    best_fold_num = int(best_key.split('_')[1])
+    return best_fold_num, scores[best_key], summary
+
+
 def load_best_fold(summary_path):
     """Load a fold-summary JSON and return (best_fold_num, stored_rp, summary_dict)."""
-    summary = json.load(open(summary_path))
-    best_key = max(summary['fold_test_rp'], key=summary['fold_test_rp'].get)
-    best_fold_num = int(best_key.split('_')[1])
-    stored_rp = summary['fold_test_rp'][best_key]
-    return best_fold_num, stored_rp, summary
+    return select_best_fold_by_key(summary_path, score_key='fold_test_rp')
+
+
+# ---------------------------------------------------------------------------
+# Raw-PDB inference helpers (used by GraPPI.py)
+# ---------------------------------------------------------------------------
+
+def parse_chain_spec(spec):
+    """Parse a chain annotation string into [(receptor_chains, ligand_chains), ...].
+
+    "A,B"      -> [(['A'], ['B'])]
+    "AB,C"     -> [(['A', 'B'], ['C'])]
+    "A,B;A,C"  -> [(['A'], ['B']), (['A'], ['C'])]
+    "AA+BB,C"  -> [(['AA', 'BB'], ['C'])]   ('+' for multi-char chain IDs)
+    """
+    complexes = []
+    for part in str(spec).split(';'):
+        part = part.strip()
+        if not part:
+            continue
+        sides = part.split(',')
+        if len(sides) != 2:
+            raise ValueError(
+                f"Invalid chain spec '{part}': expected exactly two sides "
+                f"separated by ',' (e.g. 'A,B' or 'AB,C')."
+            )
+        side_a, side_b = (s.strip() for s in sides)
+        receptor_chains = side_a.split('+') if '+' in side_a else list(side_a)
+        ligand_chains = side_b.split('+') if '+' in side_b else list(side_b)
+        if not receptor_chains or not ligand_chains:
+            raise ValueError(f"Invalid chain spec '{part}': empty side.")
+        complexes.append((receptor_chains, ligand_chains))
+    if not complexes:
+        raise ValueError(f"No complexes parsed from chain spec '{spec}'.")
+    return complexes
+
+
+def resolve_inputs(pdb_arg, chains_arg, label='pdb'):
+    """Resolve a -pdb/-chains (or -mut_pdb/-chains) pair into a list of entries:
+    [{'name': str, 'pdb_path': str, 'rel_name': str,
+      'complexes': [(rec_chains, lig_chains), ...]}]
+    """
+    entries = []
+    if os.path.isdir(pdb_arg):
+        if not (str(chains_arg).endswith('.csv') and os.path.isfile(chains_arg)):
+            raise ValueError(
+                f"-{label} is a folder; -chains must then be a CSV file with "
+                f"columns 'pdb_file,chains'."
+            )
+        df = pd.read_csv(chains_arg)
+        if 'pdb_file' not in df.columns or 'chains' not in df.columns:
+            raise ValueError(f"Chains CSV '{chains_arg}' must have columns: pdb_file,chains")
+        for _, row in df.iterrows():
+            pdb_path = os.path.join(pdb_arg, str(row['pdb_file']))
+            if not os.path.isfile(pdb_path):
+                raise FileNotFoundError(f"PDB file listed in CSV not found: {pdb_path}")
+            name = os.path.splitext(os.path.basename(pdb_path))[0]
+            entries.append({
+                'name': name, 'pdb_path': pdb_path, 'rel_name': str(row['pdb_file']),
+                'complexes': parse_chain_spec(row['chains']),
+            })
+    elif os.path.isfile(pdb_arg):
+        if str(chains_arg).endswith('.csv') and os.path.isfile(chains_arg):
+            df = pd.read_csv(chains_arg)
+            basename = os.path.basename(pdb_arg)
+            match = df[df['pdb_file'].astype(str) == basename]
+            if match.empty:
+                raise ValueError(f"No row for '{basename}' found in {chains_arg}")
+            chains_str = str(match.iloc[0]['chains'])
+        else:
+            chains_str = chains_arg
+        name = os.path.splitext(os.path.basename(pdb_arg))[0]
+        entries.append({
+            'name': name, 'pdb_path': pdb_arg, 'rel_name': os.path.basename(pdb_arg),
+            'complexes': parse_chain_spec(chains_str),
+        })
+    else:
+        raise FileNotFoundError(f"-{label} path not found: {pdb_arg}")
+    return entries
+
+
+def resolve_mut_pdb_path(mut_pdb_arg, entry):
+    """Given the wt entry, find the matching mutant PDB path under -mut_pdb."""
+    if os.path.isdir(mut_pdb_arg):
+        mut_path = os.path.join(mut_pdb_arg, entry['rel_name'])
+        if not os.path.isfile(mut_path):
+            raise FileNotFoundError(
+                f"No matching mutant PDB found for '{entry['rel_name']}' under {mut_pdb_arg} "
+                f"(expected same filename as the wild-type PDB)."
+            )
+        return mut_path
+    if os.path.isfile(mut_pdb_arg):
+        return mut_pdb_arg
+    raise FileNotFoundError(f"-mut_pdb path not found: {mut_pdb_arg}")
+
+
+def build_graph(pdb_path, receptor_chains, ligand_chains, name, dist_cutoff, aa_feature_path=None):
+    """Build a HeteroData graph directly from a raw PDB file + chain lists."""
+    row = {
+        'paths': pdb_path,
+        'Receptor Chains': ','.join(receptor_chains),
+        'Ligand Chains': ','.join(ligand_chains),
+        'affinity': 0.0,
+        'PDB': name,
+    }
+    try:
+        graph, has_interface, interface_info = create_hetero_graph_safe(
+            row, root_path='', distance_threshold=dist_cutoff,
+            aa_feature_path=aa_feature_path or DEFAULT_AA_FEATURE_PATH,
+        )
+    except OversizedError as e:
+        raise RuntimeError(str(e))
+    if not has_interface:
+        raise NoInterfaceError(
+            f"No interface found between chains {receptor_chains} and {ligand_chains} in {pdb_path} "
+            f"(distance cutoff {dist_cutoff}Å)."
+        )
+    return graph
+
+
+def get_chain_sequences(pdb_path, receptor_chains, ligand_chains, aa_feature_path=None):
+    """Return (receptor_seq, ligand_seq) matching the residue order used for
+    node features (needed to compute matching ESM embeddings)."""
+    sthg = StructureToHeteroGraph(aa_feature_path=aa_feature_path or DEFAULT_AA_FEATURE_PATH)
+    sthg.process_pdb({
+        'paths': pdb_path,
+        'Receptor Chains': ','.join(receptor_chains),
+        'Ligand Chains': ','.join(ligand_chains),
+        'PDB': 'seq',
+    }, root_path='')
+    df = sthg.AA_df
+    rec_seq = ''.join(df[df['chain_type'] == 'receptor']['res_letter'].tolist())
+    lig_seq = ''.join(df[df['chain_type'] == 'ligand']['res_letter'].tolist())
+    return rec_seq, lig_seq
+
+
+class EsmEmbedder:
+    """Lazily loads a fair-esm model and computes per-residue embeddings."""
+
+    def __init__(self, esm_dim, device):
+        if esm_dim not in ESM_MODEL_LOADERS:
+            raise ValueError(f"Unsupported ESM embedding dim: {esm_dim}")
+        try:
+            import esm
+        except ImportError as e:
+            raise ImportError(
+                "The 'fair-esm' package is required for esm/esm480 embedding types. "
+                "Install it with: pip install fair-esm"
+            ) from e
+        loader = getattr(esm.pretrained, ESM_MODEL_LOADERS[esm_dim])
+        self.model, self.alphabet = loader()
+        self.batch_converter = self.alphabet.get_batch_converter()
+        self.model = self.model.to(device).eval()
+        self.layer_id = self.model.num_layers
+        self.device = device
+
+    @torch.no_grad()
+    def embed(self, seq):
+        """Return a [len(seq), esm_dim] float tensor of per-residue embeddings."""
+        _, _, batch_tokens = self.batch_converter([("p", seq)])
+        batch_tokens = batch_tokens.to(self.device)
+        results = self.model(batch_tokens, repr_layers=[self.layer_id], return_contacts=False)
+        token_embeddings = results["representations"][self.layer_id]
+        return token_embeddings[0, 1:len(seq) + 1, :].float().cpu()
+
+
+def apply_esm_features(graph, rec_seq, lig_seq, embedder):
+    """Replace the 20-dim one-hot block of graph[part].x with ESM embeddings,
+    matching the training-time feature construction: cat(esm_emb, base[:, 20:])."""
+    rec_emb = embedder.embed(rec_seq)
+    lig_emb = embedder.embed(lig_seq)
+    if rec_emb.shape[0] != graph['receptor'].x.shape[0]:
+        raise RuntimeError(
+            f"Receptor sequence length ({rec_emb.shape[0]}) does not match "
+            f"receptor node count ({graph['receptor'].x.shape[0]})."
+        )
+    if lig_emb.shape[0] != graph['ligand'].x.shape[0]:
+        raise RuntimeError(
+            f"Ligand sequence length ({lig_emb.shape[0]}) does not match "
+            f"ligand node count ({graph['ligand'].x.shape[0]})."
+        )
+    graph['receptor'].x = torch.cat([rec_emb, graph['receptor'].x[:, 20:]], dim=1)
+    graph['ligand'].x = torch.cat([lig_emb, graph['ligand'].x[:, 20:]], dim=1)
+    return graph
+
+
+def load_encoder(enc_cfg, device):
+    """Load a frozen pretrained encoder from an enc_cfg dict with keys:
+    checkpoint_path, embedding_type, num_layers, hidden_dim_power, and
+    optionally hgt_heads, message_style."""
+    hidden_dim = 2 ** enc_cfg['hidden_dim_power']
+    return load_pretrained_encoder(
+        checkpoint_path=enc_cfg['checkpoint_path'],
+        node_in_dim=MODEL_INIT_DIM[enc_cfg['embedding_type']],
+        edge_in_dim=EDGE_IN_DIM,
+        metadata=METADATA,
+        hidden_dim=hidden_dim,
+        num_hgt_layers=enc_cfg['num_layers'],
+        hgt_heads=enc_cfg.get('hgt_heads', 4),
+        device=device,
+        message_style=enc_cfg.get('message_style', 'gated_src'),
+    )
+
+
+def build_poolhead_model(task, arch_cfg, pool_input_dim, device):
+    """Build a PoolHead{Classifier,Regressor,DDGRegressor} for *task* ('bind_score',
+    'dg', or 'mut_dg') from an explicit architecture config dict (as read from
+    model_configs/config_disc_binder.yaml / config_dG.yaml / config_ddG.yaml)."""
+    common = dict(
+        pool_input_dim=pool_input_dim,
+        hidden_dim=arch_cfg.get('ft_hdim', 512),
+        metadata=METADATA,
+        dropout=arch_cfg.get('dropout', 0.2),
+        pool_mode=arch_cfg.get('pool_mode', 'cross_attn'),
+        cross_attn_queries=arch_cfg.get('cross_attn_queries', 2),
+        cross_attn_heads=arch_cfg.get('cross_attn_heads', 4),
+    )
+    if task == 'bind_score':
+        model = create_poolhead_model(
+            model_type='classifier', classifier_layers=arch_cfg.get('classifier_layers', 3), **common)
+    elif task == 'dg':
+        model = create_poolhead_model(
+            model_type='regressor', regressor_layers=arch_cfg.get('regressor_layers', 3), **common)
+    elif task == 'mut_dg':
+        model = create_poolhead_model(
+            model_type='ddg_regressor', regressor_layers=arch_cfg.get('regressor_layers', 4),
+            ddg_input_mode=arch_cfg.get('ddg_input_mode', 'concat_diff'), **common)
+    else:
+        raise ValueError(f"No torch head for task '{task}'")
+    return model.to(device)
+
+
+def load_torch_head_state(model, checkpoint_path, device):
+    """Load a state-dict checkpoint (raw or wrapped in {'full_model_state_dict': ...})
+    into *model*, and set it to eval mode."""
+    state = torch.load(checkpoint_path, map_location=device)
+    if isinstance(state, dict) and 'full_model_state_dict' in state:
+        state = state['full_model_state_dict']
+    model.load_state_dict(state, strict=True)
+    model.eval()
+    return model
+
+
+def load_pickle_model(path):
+    """Load a scikit-learn model pickle from an explicit path."""
+    with open(path, 'rb') as f:
+        return pickle.load(f)
 
 
 # ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
+
 
 def load_samples_from_dir(directory):
     """Load all .pkl files from *directory* and extract their protein_graph.
@@ -373,8 +644,7 @@ def load_ml_model(ml_dir, task, jk_suffix, model_name, fold_num=None):
             f"ML model pickle not found: {path}\n"
             "Re-run the corresponding ML training module to save model pickles."
         )
-    with open(path, 'rb') as f:
-        model = pickle.load(f)
+    model = load_pickle_model(path)
     print(f"Loaded ML model: {path}")
     return model
 

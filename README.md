@@ -65,35 +65,111 @@ pip install -U scikit-learn
 pip install torch==2.7.1+cu128 torchvision==0.22.1+cu128 torchaudio==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128
 pip install torch_geometric
 pip install pyg_lib torch_scatter torch_sparse torch_cluster -f https://data.pyg.org/whl/torch-2.7.1+cu128.html
+pip install fair-esm
 ```
 
-> **Note:** Use the full Python path with `nohup` — `conda activate` does not propagate to background processes:
-> ```bash
-> nohup /path/to/miniconda3/envs/GraPPI/bin/python train_unified.py -config model_configs/config_ssl.yaml > train_unified.out 2>&1 &
-> ```
 
 ## Quick Start
 
-```bash
-# Full pipeline (SSL + all downstream tasks)
-python train_unified.py -config model_configs/config_full_pipeline.yaml
 
-# SSL pre-training only
-python train_unified.py -config model_configs/config_ssl.yaml
 
-# Individual downstream tasks (requires pretrained encoder)
-python train_unified.py -config model_configs/config_dG.yaml
-python train_unified.py -config model_configs/config_ddG.yaml
-python train_unified.py -config model_configs/config_disc_binder.yaml
+| Task         | What it predicts                                | Default model                    |
+|--------------|---------------------------------------------------|-----------------------------------|
+| `embed`      | Per-residue encoder embeddings (no task head)      | `esm-6-1024` encoder              |
+| `bind_score` | Binder probability (classification)                | `esm-2-1024` encoder + MLP head   |
+| `dg`         | Binding free energy ΔG (regression)                | `esm-6-512` encoder + SVR head    |
+| `mut_dg`     | Effect of mutation on binding, ΔΔG (regression)    | `esm-2-1024` encoder + SVR head   |
 
-# Baseline models (no pretrained encoder)
-python train_unified.py -config model_configs/config_baseline.yaml
+
+### Chain annotation syntax
+
+Each complex is described as `"<side_A_chains>,<side_B_chains>"`:
+
 ```
+"A,B"      -> side A = chain A,        side B = chain B
+"AB,C"     -> side A = chains A and B, side B = chain C
+"AA+BB,C"  -> use '+' to separate multi-character chain IDs
+"A,B;A,C"  -> multiple complexes in one PDB, separated by ';'
+```
+
+### Single-complex examples
+
+```bash
+# Extract per-residue embeddings
+python GraPPI.py -pdb complex.pdb -chains A,B -task embed
+
+# Binder classification probability
+python GraPPI.py -pdb complex.pdb -chains A,B -task bind_score
+
+# Binding free energy (ΔG) regression
+python GraPPI.py -pdb complex.pdb -chains A,B -task dg
+
+# Mutation ΔΔG regression (requires a mutant structure)
+python GraPPI.py -pdb complex.pdb -chains A,B -task mut_dg -mut_pdb complex_mut.pdb
+```
+
+### Batch mode (folder of PDBs)
+
+Point `-pdb` at a folder and `-chains` at a CSV file with columns `pdb_file,chains`:
+
+```csv
+pdb_file,chains
+1abc.pdb,"A,B"
+2xyz.pdb,"AB,C"
+```
+
+```bash
+python GraPPI.py -pdb pdb_folder/ -chains chains.csv -task dg -output_dir results/
+```
+
+For `-task mut_dg` in batch mode, `-mut_pdb` must also be a folder, with mutant files sharing the same filename as their wild-type counterpart in `-pdb`.
+
+### Reproduce the dG test results
+
+The repository provides `S79_test.csv` and `S90_test.csv`, with PDB identifiers,
+chain assignments, structure paths, and experimental affinities. Place the
+corresponding structures under `../GraPPI_data/PDB/S79/` and
+`../GraPPI_data/PDB/S90/`, then run the default `esm-6-512` encoder + SVR model:
+
+```bash
+python GraPPI.py \
+  -pdb ../GraPPI_data/PDB/S79 \
+  -chains S79_test.csv \
+  -task dg \
+  -output_dir inference_results/S79 \
+  -gpu_id 0
+
+python GraPPI.py \
+  -pdb ../GraPPI_data/PDB/S90 \
+  -chains S90_test.csv \
+  -task dg \
+  -output_dir inference_results/S90 \
+  -gpu_id 0
+```
+
+Predictions are written to `inference_results/S79/dg_results.csv` and
+`inference_results/S90/dg_results.csv`. Each file starts with the columns
+`PDB,predicted_dG`. Expected Pearson correlations against the `affinity` column
+in the input tables are approximately 0.684 for S79, 0.690 for S90, and 0.6845
+for the combined sets.
+
+
+### Other useful flags
+
+- `-emb_type {esm,base}` — only used for `-task embed`; selects the default embedding-type encoder (`esm-6-1024` vs `6layers_10hdim` base encoder).
+- `-output_dir` — where results/embeddings are written (default: current directory).
+- `-gpu_id` — CUDA device index (default: 0; falls back to CPU if unavailable).
+- `-dist` — distance cutoff (Å) for interface/edge construction (default: 8.0).
+- `-encoder_config_path` — use a custom SSL encoder instead of the default (directory, `ssl_edge_config.json`, or the `.pt` checkpoint itself).
+- `-task_model_config_path` — use a custom task-head checkpoint directly (`.pt` for a PyTorch pool+head model, `.pkl` for a scikit-learn model). Requires `-encoder_config_path` to also be set.
+
+Run `python GraPPI.py -h` for the full flag reference and more detail on default-checkpoint resolution.
 
 ## Repository Structure
 
 ```
 train_unified.py              # Entry point — orchestrates all training phases
+GraPPI.py                     # Inference CLI — embed / bind_score / dg / mut_dg on new complexes
 SSL_train_module.py           # SSL pre-training orchestration
 finetune_dG_module.py         # ΔG regression fine-tuning (5-fold CV + test)
 finetune_ddG_module.py        # ΔΔG mutation fine-tuning (5-fold CV + test)

@@ -3,15 +3,15 @@ import yaml
 from typing import Dict
 import torch
 from utils.Training_modules.common_utils import set_seed
-from SSL_train_module import run_ssl_pretraining
-from finetune_dG_module import run_dG_finetuning
-from finetune_disc_binder_module import run_disc_binder_finetuning
-from finetune_ddG_module import run_ddg_finetuning
-from finetune_ml_dG_module import run_ml_dG_finetuning
-from finetune_ml_ddG_module import run_ml_ddG_finetuning
-from finetune_ml_disc_binder_module import run_ml_disc_binder_finetuning
+from utils.SSL_modules.SSL_train_module import run_ssl_pretraining
+from utils.finetune_modules.finetune_dG_module import run_dG_finetuning
+from utils.finetune_modules.finetune_disc_binder_module import run_disc_binder_finetuning
+from utils.finetune_modules.finetune_ddG_module import run_ddg_finetuning
+from utils.finetune_modules.finetune_ml_dG_module import run_ml_dG_finetuning
+from utils.finetune_modules.finetune_ml_ddG_module import run_ml_ddG_finetuning
+from utils.finetune_modules.finetune_ml_disc_binder_module import run_ml_disc_binder_finetuning
 from baseline_modules import run_baseline_test
-from esm_baseline_modules import run_esm_baseline_test
+from utils.finetune_modules.esm_baseline_modules import run_esm_baseline_test
 
 
 # ============================================================================
