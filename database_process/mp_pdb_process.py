@@ -42,13 +42,11 @@ elif if_random_mut:
     max_residues=1200
 else:
     #wt_df = pd.read_csv('./saved_tables/wt_table.csv') # ~ 3k
-    #df = pd.read_pickle('./saved_tables/cleaned_mutant_complex_table.pkl') # ~ 6.8k
     #abet_df = pd.read_csv('./saved_tables/AbEpiTope_table.csv') # ~ 0.3k
     #golden_df = pd.read_csv('./saved_tables/dimer_table.csv') # ~ 8.69k
     #swap_df = pd.read_csv('./saved_tables/swapped_table.csv') # ~ 3.0k
-    #capri_df = pd.read_csv('./saved_tables/capri_all_table.csv') # ~ 3.4k
     process_df = pd.read_csv('./saved_tables/preppi_db.csv') # ~ 15k
-    #df = pd.concat([wt_df, golden_df, abet_df, swap_df, capri_df], ignore_index=True)
+    #df = pd.concat([wt_df, golden_df, abet_df, swap_df], ignore_index=True)
     save_path_hg = '../../GraPPI_data/curated_db/preppi_sthg_8A'
     pdb_root_path = ''
 #save_path_3g = '../../curated_db/all_sttgs_8A'

@@ -73,6 +73,122 @@ training_task:
 
 The SSL checkpoint path is passed automatically to each downstream task.
 
+## Required graph preprocessing before training
+
+This repository assumes the graph cache is generated before training starts. The training modules do not reconstruct graph objects from raw PDB files on the fly; they expect pickle-based graph datasets already saved under `GraPPI_data/curated_db`.
+
+If you want a clean retraining workflow without keeping preprocessed graphs in the repo, regenerate the dataset from the source PDB tables in the following order.
+
+### 1. Create the curated graph cache directory
+
+```bash
+mkdir -p /path/to/GraPPI_data/curated_db
+```
+
+Keep the data folders under this root so that the training modules can discover them by the expected names such as `pos_sthg_8A`, `unmut_sthg_8A`, `mutant_sthg_8A`, `random_mut_sthg_8A`, and the ESM variants.
+
+### 2. Edit and run the graph conversion script
+
+The main graph generation entry point is [database_process/mp_pdb_process.py](database_process/mp_pdb_process.py). This script builds a `StructureToHeteroGraph` object for each PDB row, performs interface validation, and saves the result as a `.pkl` file.
+
+For each dataset, edit the flags and the dataframe path at the top of the script:
+
+```python
+if_mut = False
+if_random_mut = False
+process_df = pd.read_csv('./saved_tables/dimer_table.csv')
+save_path_hg = '../../GraPPI_data/curated_db/pos_sthg_8A'
+```
+
+Then run:
+
+```bash
+cd database_process
+python mp_pdb_process.py
+```
+
+Repeat the same process for each dataset by switching `process_df` and `save_path_hg` to the target folder.
+
+### 3. Build the positive set and wild-type set
+
+The training code expects the positive graph folder to be named `pos_sthg_8A`.
+
+1. Process `dimer_table.csv` and save to `GraPPI_data/curated_db/pos_sthg_8A`
+2. Process `wt_table.csv` and save to `GraPPI_data/curated_db/unmut_sthg_8A`
+3. Copy the `.pkl` files from `unmut_sthg_8A` into `pos_sthg_8A` and overwrite if a file already exists
+
+This gives the model a positive set consistent with the repo's naming conventions while preserving the wild-type set for paired mutation tasks and downstream evaluation.
+
+### 4. Build the mutant set
+
+For mutated complexes, switch the script to mutant mode:
+
+```python
+if_mut = True
+if_random_mut = False
+process_df = pd.read_csv('./saved_tables/mutant_table.csv')
+save_path_hg = '../../GraPPI_data/curated_db/mutant_sthg_8A'
+```
+
+Then run the script again. This creates the paired mutant graph set used by the ΔΔG regression workflow.
+
+### 5. Build the auxiliary decoy and non-binding datasets
+
+Use the same conversion flow for the remaining dataset tables:
+
+- `preppi_db.csv` → `GraPPI_data/curated_db/preppi_sthg_8A`
+- `swapped_table.csv` → `GraPPI_data/curated_db/swapped_sthg_8A`
+- `AbEpiTope_table.csv` → `GraPPI_data/curated_db/swapped_abag_sthg_8A`
+
+These folders are used as additional positives, negatives, or benchmark sets depending on the downstream task.
+
+### 6. Build the random-mutated negative set
+
+For the random-decoy pool used in classification and negative sampling, enable the random mutation mode:
+
+```python
+if_mut = False
+if_random_mut = True
+num_mut_on_each = 5
+process_df = pd.read_csv('./saved_tables/dimer_table.csv')
+save_path_hg = '../../GraPPI_data/curated_db/random_mut_sthg_8A'
+```
+
+This writes the folder used by the repo as `random_mut_sthg_8A` for negative sampling.
+
+### 7. Add ESM features through the notebook workflow
+
+After the graph folders are created, open [database_process/Include_esm.ipynb](database_process/Include_esm.ipynb) and follow the same sample-type logic used in the notebook.
+
+Important notes from the notebook:
+
+- Set `dist = '8A'`
+- Set `sample_type` according to the dataset you are processing, e.g. `unmut`, `swapped`, `dimer`, `swapped_abag`, `preppi`, `random_mut`, or `mutant`
+- For the mutant dataset, set `if_mut = True`; otherwise keep it `False`
+- Run the "Get seq dict" cells to create `*_seq_dicts_8A_hg.pkl`
+- Run the ESM embedding extraction cells to generate `*_seq_dicts_esm_8A_hg.pkl` or `*_seq_dicts_esm480_8A_hg.pkl`
+- Run the final "Load new seq dict with ESM emb" cells to write graph files into folders like:
+  - `pos_sthg_esm_8A`
+  - `unmut_sthg_esm_8A`
+  - `mutant_sthg_esm_8A`
+  - `random_mut_sthg_esm_8A`
+  - `preppi_sthg_esm_8A`
+
+The notebook also handles test-domain folders such as `S79`, `S90`, and `SKEMPI_test` by copying the ESM-enriched graphs into the corresponding `_esm` directories.
+
+### 8. Once the graph cache is ready
+
+At this point, the repo is ready for SSL and finetuning:
+
+- `GraPPI_data/curated_db/pos_sthg_8A` (or ESM version) for positive graphs
+- `GraPPI_data/curated_db/unmut_sthg_8A` and `mutant_sthg_8A` for mutation tasks
+- `GraPPI_data/curated_db/random_mut_sthg_8A` for negative sampling
+- the generated ESM directories for downstream embedding loading
+
+With these folders in place, the SSL training flow in [train_unified.py](train_unified.py) can proceed without any additional graph-generation step.
+
+For downstream tasks, if you are not using built-in benchmark splits, the default training workflow still works as long as the required graph directories exist and `pdb_root` points to `GraPPI_data/curated_db`.
+
 ## Configuration Reference
 
 All settings live in a single YAML file. The top-level keys are:
