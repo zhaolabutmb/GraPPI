@@ -3,7 +3,7 @@
 
 **GraPPI** is a self-supervised graph representation-learning framework designed to learn transferable representations of protein–protein complexes. By integrating pretrained protein sequence embeddings with three-dimensional structural and physicochemical information, GraPPI captures protein-complex interaction context and supports multiple downstream protein–protein interaction (PPI) prediction tasks.
 <p align="center">
-<img src="Figures/GitHub_cover.pdf" width="900">
+<img src="Figures/GitHub_cover.pdf" width="850">
 </p>
 <p align="center">
   <em>
@@ -29,23 +29,6 @@ GraPPI consists of two main components:
 
    - **Mutant-complex binding-affinity prediction:** Predicting binding free energy for mutant protein complexes (mutant $\Delta G$).
 
-### PPIencoder Architecture
-
-**PPIencoder** is an edge-enhanced Heterogeneous Graph Transformer (HGT) that represents protein complexes as heterogeneous residue graphs.
-
-Each complex contains two node types corresponding to the interacting proteins (designated **receptor** and **ligand**) and four directed edge relations:
-
-- Receptor → Receptor (intra-receptor)
-
-- Ligand → Ligand (intra-ligand)
-
-- Receptor → Ligand (intermolecular)
-
-- Ligand → Receptor (intermolecular)
-
-**Node features** integrate pretrained ESM-2 residue embeddings, amino-acid physicochemical properties, and binding-context information. **Edge features** describe inter-residue geometry using distance histograms and spatial direction vectors.
-
-An edge message-passing module incorporates geometric edge information into residue representations, followed by HGT blocks that learn interaction-aware residue embeddings.
 
 ### Model Variants
 
@@ -55,33 +38,6 @@ An edge message-passing module incorporates geometric edge information into resi
 
 Both variants use self-supervised masked-edge prediction during pretraining. For downstream applications, the pretrained encoder is frozen, and only the task-specific prediction modules are trained.
 
-
-## Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Phase 1: SSL Pre-training                        │
-│                                                                     │
-│   PDB complexes → Heterogeneous Graphs → EdgeEnhancedHGT Encoder    │
-│                         ↓                                           │
-│         Masked Edge Prediction (inter + intra molecular)            │
-│                         ↓                                           │
-│             Pre-trained Encoder Weights                             │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────────────┐
-│               Phase 2: Downstream Fine-tuning                       │
-│                                                                     │
-│  Load frozen encoder → Precompute node embeddings (+ optional JK)   │
-│  Free encoder from memory → Train Pool+Head models only             │
-│                                                                     │
-│  ┌─────────────┐  ┌────────────────┐  ┌───────────────────┐         │
-│  │ ΔG Regressor│  │mut ΔG Regressor│  │ Binder Classifier │         │
-│  │ (5-fold CV) │  │   (5-fold CV)  │  │    (5-fold CV)    │         │
-│  │    (test)   │  │     (test)     │  │      (test)       │         │
-│  └─────────────┘  └────────────────┘  └───────────────────┘         │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 ## Key Features
 
@@ -94,7 +50,7 @@ Both variants use self-supervised masked-edge prediction during pretraining. For
 - **Flexible node features**: base (25-dim), ESM-2 (1285-dim) or concatenated variants
 - **Baseline comparison**: MLP and ML models (RandomForest, GradientBoosting, SVM) for benchmarking
 
-## Datasets
+## Data
 
 The datasets generated and curated in this study have been deposited in Zenodo. The GraPPI-SSL
 dataset, comprising curated protein–protein complexes used for self-supervised pretraining, is
