@@ -1,15 +1,10 @@
 # GraPPI: A Self-Supervised Graph Encoder for Transferable Protein–Protein Interaction Modeling
 ## Overview
-# GraPPI: a unified graph-based deep learning framework designed specifically for protein complex modeling
 
-**GraPPI** is a self-supervised graph neural network framework for protein-protein interaction (PPI) modeling. It includes: (1) self-supervised pre-training via masked edge prediction on protein complex graphs; (2) frozen-encoder fine-tuning on three downstream tasks — binding mode classification, and binding affinity ($\Delta G$) regression, mutational binding affinity upon mutation (mut $\Delta G$) regression.
+**GraPPI** is a unified graph neural network (GNN) framework designed for protein-protein interaction (PPI) modeling. It includes: (1) self-supervised pre-training via masked edge prediction on protein complex graphs; (2) frozen-encoder fine-tuning on three downstream tasks — binding mode classification, and binding affinity ($\Delta G$) regression, mutational binding affinity upon mutation (mut $\Delta G$) regression.
 
-The core encoder of GraPPI is an **Edge-Enhanced Heterogeneous Graph Transformer (EdgeEnhancedHGT)** that processes protein complexes as heterogeneous graphs with receptor and ligand node types (binding parts 1 and 2) and 3 edge types (intra-receptor, intra-ligand, and bidirectional inter-molecular edges). Node features encode amino acid identity with ESM-2 and physicochemical properties (optionally residue one-hot encoded for sequence identity), while edge features capture inter-residue distance histograms and direction vectors.
+The core encoder of GraPPI is **PPIEncoder**, an Edge-Enhanced Heterogeneous Graph Transformer that processes protein complexes as heterogeneous graphs with receptor and ligand node types (binding parts 1 and 2) and 3 edge types (intra-receptor, intra-ligand, and bidirectional inter-molecular edges). Node features encode amino acid identity with ESM-2 and physicochemical properties (optionally residue one-hot encoded for sequence identity), while edge features capture inter-residue distance histograms and direction vectors.
 
-## Abstract
-
-Protein-protein interactions (PPIs) are fundamental to cellular processes and prime targets for therapeutic development. While recent AI advances, including protein language models, excel at capturing sequence and monomeric structure representations, they often inadequately model the intricate structural, geometrical, and physicochemical contexts of protein complexes—especially at the binding interface. Consequently, existing AI approaches for PPIs often rely on fragmented, task-specific models with limited model generalizability.
-To bridge this gap, we developed GraPPI, a unified graph-based deep learning framework designed specifically for protein complex modeling. GraPPI represents complexes as heterogeneous graphs, using residues as nodes and spatial relationships as edges. At its core is PPIencoder, a self-supervised model that acts as a “language” encoder for protein complexes, learning transferable representations by explicitly capturing the precise geometric and physicochemical environment of protein interfaces. GraPPI then leverages these pretrained embeddings for critical downstream evaluations: classifying binders with plausible interface against decoys and predicting binding affinity.
 
 ## Pipeline
 
@@ -49,9 +44,13 @@ To bridge this gap, we developed GraPPI, a unified graph-based deep learning fra
 - **Flexible node features**: base (25-dim), ESM-2 (1285-dim) or concatenated variants
 - **Baseline comparison**: MLP and ML models (RandomForest, GradientBoosting, SVM) for benchmarking
 
-## Data
+## Datasets
 
-Original datasets, curated datasets, Dunbrack library, and training outputs are not included in this repo. They are stored at [OneDrive Link](https://liveutmb-my.sharepoint.com/:f:/r/personal/hazhao_utmb_edu/Documents/ZhaoLab_Files/ZS?csf=1&web=1&e=IBx1YC).
+The datasets generated and curated in this study have been deposited in Zenodo. The GraPPI-SSL
+dataset, comprising curated protein–protein complexes used for self-supervised pretraining, is
+available at https://zenodo.org/records/22946815. The NegaPPI dataset, comprising curated
+negative and decoy protein–protein complexes for model development and benchmarking, is
+available at https://zenodo.org/records/22968504.
 
 ## Installation
 
@@ -212,3 +211,5 @@ run_multiple_finetune.sh      # Batch fine-tuning over architecture grid
 - **[README_SSL_EDGE_PREDICTOR.md](README_SSL_EDGE_PREDICTOR.md)** — SSL edge prediction model and training strategies
 - **[MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md)** — Detailed model architecture with mathematical formulations
 
+## Citation
+Song, Z., Shi, Z., Sun, G., Negi, S., Fausther-Bovendo, H., & Zhao, H. (2026). GraPPI: A Self-Supervised Graph Encoder for Transferable Protein—Protein Interaction Modeling. bioRxiv, 2026-09. 
