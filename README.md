@@ -3,7 +3,7 @@
 
 **GraPPI** is a self-supervised graph representation-learning framework designed to learn transferable representations of protein–protein complexes. By integrating pretrained protein sequence embeddings with three-dimensional structural and physicochemical information, GraPPI captures protein-complex interaction context and supports multiple downstream protein–protein interaction (PPI) prediction tasks.
 <p align="center">
-<img src="Figures/GitHub_cover.pdf" width="850">
+<img src="Figures/GitHub_cover.jpg" width="850">
 </p>
 <p align="center">
   <em>
@@ -20,15 +20,10 @@
 GraPPI consists of two main components:
 
 1. **Self-supervised pretraining:** A protein-complex graph encoder (**PPIencoder**) learns residue-level representations through masked-edge prediction without requiring experimental binding-affinity labels.
-
 2. **Downstream applications:** The pretrained PPIencoder remains frozen, while task-specific prediction modules are trained using its learned representations for three complementary tasks:
-
    - **Binding-mode classification:** Distinguishing plausible protein–protein complexes from perturbed or decoy binding modes.
-
    - **Absolute binding-affinity prediction:** Predicting protein–protein binding free energy ($\Delta G$).
-
    - **Mutant-complex binding-affinity prediction:** Predicting binding free energy for mutant protein complexes (mutant $\Delta G$).
-
 
 ### Model Variants
 
@@ -74,10 +69,7 @@ pip install pyg_lib torch_scatter torch_sparse torch_cluster -f https://data.pyg
 pip install fair-esm
 ```
 
-
 ## Quick Start
-
-
 
 | Task         | What it predicts                                | Default model                    |
 |--------------|---------------------------------------------------|-----------------------------------|
@@ -87,7 +79,7 @@ pip install fair-esm
 | `mut_dg`     | Effect of mutation on binding, ΔΔG (regression)    | `esm-2-1024` encoder + SVR head   |
 
 
-### Chain annotation syntax
+#### Chain annotation syntax
 
 Each complex is described as `"<side_A_chains>,<side_B_chains>"`:
 
@@ -98,7 +90,7 @@ Each complex is described as `"<side_A_chains>,<side_B_chains>"`:
 "A,B;A,C"  -> multiple complexes in one PDB, separated by ';'
 ```
 
-### Single-complex examples
+#### Single-complex examples
 
 ```bash
 # Extract per-residue embeddings
@@ -114,7 +106,7 @@ python GraPPI.py -pdb complex.pdb -chains A,B -task dg
 python GraPPI.py -pdb complex.pdb -chains A,B -task mut_dg -mut_pdb complex_mut.pdb
 ```
 
-### Batch mode (folder of PDBs)
+#### Batch mode (folder of PDBs)
 
 Point `-pdb` at a folder and `-chains` at a CSV file with columns `pdb_file,chains`:
 
@@ -130,7 +122,7 @@ python GraPPI.py -pdb pdb_folder/ -chains chains.csv -task dg -output_dir result
 
 For `-task mut_dg` in batch mode, `-mut_pdb` must also be a folder, with mutant files sharing the same filename as their wild-type counterpart in `-pdb`.
 
-### Reproduce the $\Delta G$ test results
+#### Reproduce the $\Delta G$ test results
 
 The repository provides `S79_test.csv` and `S90_test.csv`, with PDB identifiers,
 chain assignments, structure paths, and experimental affinities. Place the
@@ -160,7 +152,7 @@ in the input tables are approximately 0.684 for S79, 0.690 for S90, and 0.6845
 for the combined sets.
 
 
-### Other useful flags
+#### Other useful flags
 
 - `-emb_type {esm,base}` — only used for `-task embed`; selects the default embedding-type encoder (`esm-6-1024` vs `6layers_10hdim` base encoder).
 - `-output_dir` — where results/embeddings are written (default: current directory).
@@ -212,10 +204,11 @@ run_multiple_finetune.sh      # Batch fine-tuning over architecture grid
 ```
 
 ## Documentation
-
 - **[README_UNIFIED_TRAINING.md](README_UNIFIED_TRAINING.md)** — Unified training pipeline details and configuration reference
 - **[README_SSL_EDGE_PREDICTOR.md](README_SSL_EDGE_PREDICTOR.md)** — SSL edge prediction model and training strategies
 - **[MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md)** — Detailed model architecture with mathematical formulations
 
 ## Citation
 Song, Z., Shi, Z., Sun, G., Negi, S., Fausther-Bovendo, H., & Zhao, H. (2026). GraPPI: A Self-Supervised Graph Encoder for Transferable Protein—Protein Interaction Modeling. bioRxiv, 2026-09. 
+
+
