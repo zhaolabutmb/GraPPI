@@ -2,6 +2,20 @@
 ## Overview
 
 **GraPPI** is a self-supervised graph representation-learning framework designed to learn transferable representations of protein–protein complexes. By integrating pretrained protein sequence embeddings with three-dimensional structural and physicochemical information, GraPPI captures protein-complex interaction context and supports multiple downstream protein–protein interaction (PPI) prediction tasks.
+<p align="center">
+<img src="Figures/GitHub_cover.pdf" width="900">
+</p>
+<p align="center">
+  <em>
+    Overview of GraPPI. Protein complexes are represented as heterogeneous
+    residue graphs integrating ESM-2 embeddings, physicochemical features,
+    and intermolecular geometry. PPIencoder is pretrained through self-supervised
+    masked-edge prediction. The pretrained encoder is subsequently frozen,
+    and task-specific prediction modules are trained for binding-mode
+    classification, absolute binding-affinity prediction (ΔG), and
+    mutant-complex binding-affinity prediction (mutant ΔG).
+  </em>
+</p>
 
 GraPPI consists of two main components:
 
