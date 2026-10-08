@@ -1,9 +1,45 @@
 # GraPPI: A Self-Supervised Graph Encoder for Transferable Protein–Protein Interaction Modeling
 ## Overview
 
-**GraPPI** is a unified graph neural network (GNN) framework designed for protein-protein interaction (PPI) modeling. It includes: (1) self-supervised pre-training via masked edge prediction on protein complex graphs; (2) frozen-encoder fine-tuning on three downstream tasks — binding mode classification, and binding affinity ($\Delta G$) regression, mutational binding affinity upon mutation (mut $\Delta G$) regression.
+**GraPPI** is a self-supervised graph representation-learning framework designed to learn transferable representations of protein–protein complexes. By integrating pretrained protein sequence embeddings with three-dimensional structural and physicochemical information, GraPPI captures protein-complex interaction context and supports multiple downstream protein–protein interaction (PPI) prediction tasks.
 
-The core encoder of GraPPI is **PPIEncoder**, an Edge-Enhanced Heterogeneous Graph Transformer that processes protein complexes as heterogeneous graphs with receptor and ligand node types (binding parts 1 and 2) and 3 edge types (intra-receptor, intra-ligand, and bidirectional inter-molecular edges). Node features encode amino acid identity with ESM-2 and physicochemical properties (optionally residue one-hot encoded for sequence identity), while edge features capture inter-residue distance histograms and direction vectors.
+GraPPI consists of two main components:
+
+1. **Self-supervised pretraining:** A protein-complex graph encoder (**PPIencoder**) learns residue-level representations through masked-edge prediction without requiring experimental binding-affinity labels.
+
+2. **Downstream applications:** The pretrained PPIencoder remains frozen, while task-specific prediction modules are trained using its learned representations for three complementary tasks:
+
+   - **Binding-mode classification:** Distinguishing plausible protein–protein complexes from perturbed or decoy binding modes.
+
+   - **Absolute binding-affinity prediction:** Predicting protein–protein binding free energy ($\Delta G$).
+
+   - **Mutant-complex binding-affinity prediction:** Predicting binding free energy for mutant protein complexes (mutant $\Delta G$).
+
+### PPIencoder Architecture
+
+**PPIencoder** is an edge-enhanced Heterogeneous Graph Transformer (HGT) that represents protein complexes as heterogeneous residue graphs.
+
+Each complex contains two node types corresponding to the interacting proteins (designated **receptor** and **ligand**) and four directed edge relations:
+
+- Receptor → Receptor (intra-receptor)
+
+- Ligand → Ligand (intra-ligand)
+
+- Receptor → Ligand (intermolecular)
+
+- Ligand → Receptor (intermolecular)
+
+**Node features** integrate pretrained ESM-2 residue embeddings, amino-acid physicochemical properties, and binding-context information. **Edge features** describe inter-residue geometry using distance histograms and spatial direction vectors.
+
+An edge message-passing module incorporates geometric edge information into residue representations, followed by HGT blocks that learn interaction-aware residue embeddings.
+
+### Model Variants
+
+- **GraPPI:** Uses pretrained ESM-2 residue embeddings together with structural and physicochemical features.
+
+- **GraPPI-base:** Replaces ESM-2 embeddings with 20-dimensional amino-acid one-hot representations while retaining the same graph architecture and structural features.
+
+Both variants use self-supervised masked-edge prediction during pretraining. For downstream applications, the pretrained encoder is frozen, and only the task-specific prediction modules are trained.
 
 
 ## Pipeline
