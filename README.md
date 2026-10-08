@@ -38,7 +38,7 @@ Both variants use self-supervised masked-edge prediction during pretraining. For
 
 - **Unified training pipeline** via YAML configs (`train_unified.py`)
 - **Heterogeneous graph representation** with gated edge message passing + HGT layers
-- **Multiple SSL strategies**: dynamic, stratified, curriculum, hard negative sampling
+- **Multiple Self-Supervised Learning (SSL) strategies**: dynamic, stratified, curriculum, hard negative sampling
 - **Frozen-encoder paradigm**: precompute embeddings once, train lightweight heads efficiently
 - **Jumping Knowledge (JK-Net)**: aggregate intermediate HGT layer outputs for richer representations
 - **Cross-attention aggregation**: learnable queries with cross-chain interaction for graph-level pooling
@@ -90,7 +90,7 @@ Each complex is described as `"<side_A_chains>,<side_B_chains>"`:
 "A,B;A,C"  -> multiple complexes in one PDB, separated by ';'
 ```
 
-#### Single-complex examples
+#### Single-complex example
 
 ```bash
 # Extract per-residue embeddings
@@ -122,7 +122,7 @@ python GraPPI.py -pdb pdb_folder/ -chains chains.csv -task dg -output_dir result
 
 For `-task mut_dg` in batch mode, `-mut_pdb` must also be a folder, with mutant files sharing the same filename as their wild-type counterpart in `-pdb`.
 
-#### Reproduce the $\Delta G$ test results
+#### Reproduce the $\Delta G$ results
 
 The repository provides `S79_test.csv` and `S90_test.csv`, with PDB identifiers,
 chain assignments, structure paths, and experimental affinities. Place the
@@ -209,6 +209,8 @@ run_multiple_finetune.sh      # Batch fine-tuning over architecture grid
 - **[MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md)** — Detailed model architecture with mathematical formulations
 
 ## Citation
-Song, Z., Shi, Z., Sun, G., Negi, S., Fausther-Bovendo, H., & Zhao, H. (2026). GraPPI: A Self-Supervised Graph Encoder for Transferable Protein—Protein Interaction Modeling. bioRxiv, 2026-09. 
+Song, Z., Shi, Z., Sun, G., Negi, S., Fausther-Bovendo, H., & Zhao, H. (2026). [GraPPI: A Self-Supervised Graph Encoder for Transferable Protein—Protein Interaction Modeling](https://www.biorxiv.org/content/10.64898/2026.09.28.755140v1). bioRxiv, 2026-09. 
+
+
 
 
