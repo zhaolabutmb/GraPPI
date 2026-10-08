@@ -1,5 +1,6 @@
-# GraPPI: a unified graph-based deep learning framework designed specifically for protein complex modeling
+# GraPPI: A Self-Supervised Graph Encoder for Transferable Protein–Protein Interaction Modeling
 ## Overview
+# GraPPI: a unified graph-based deep learning framework designed specifically for protein complex modeling
 
 **GraPPI** is a self-supervised graph neural network framework for protein-protein interaction (PPI) modeling. It includes: (1) self-supervised pre-training via masked edge prediction on protein complex graphs; (2) frozen-encoder fine-tuning on three downstream tasks — binding mode classification, and binding affinity ($\Delta G$) regression, mutational binding affinity upon mutation (mut $\Delta G$) regression.
 
@@ -124,7 +125,7 @@ python GraPPI.py -pdb pdb_folder/ -chains chains.csv -task dg -output_dir result
 
 For `-task mut_dg` in batch mode, `-mut_pdb` must also be a folder, with mutant files sharing the same filename as their wild-type counterpart in `-pdb`.
 
-### Reproduce the dG test results
+### Reproduce the $\Delta G$ test results
 
 The repository provides `S79_test.csv` and `S90_test.csv`, with PDB identifiers,
 chain assignments, structure paths, and experimental affinities. Place the
