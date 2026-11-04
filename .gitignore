@@ -224,3 +224,6 @@ __marimo__/
 
 # yaml folder
 model_configs/for_multirun/
+
+#local conda
+.conda/
