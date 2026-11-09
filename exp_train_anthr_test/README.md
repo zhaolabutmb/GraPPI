@@ -17,13 +17,26 @@ directory, never in this repository.
 
 | Row | Encoder | Head | Trained here? |
 |---|---|---|---|
-| **GraPPI** | frozen `2layers_10hdim_esm` (2 HGT layers, hidden 2^10) | cross-attn pooling + 2-layer MLP | yes, on 3,669 exp designs |
-| **ESM** | none — raw 1,280-dim ESM-2 node features | **same** head config | yes, on 3,669 exp designs |
+| **GraPPI** (`--mode grappi`) | frozen `2layers_10hdim_esm` (2 HGT layers, hidden 2^10, ESM input) | cross-attn pooling + 2-layer MLP | yes, on 3,669 exp designs |
+| **GraPPI base** (`--mode grappi_base`) | frozen `2layers_10hdim` (same shape, 25-dim base node features) | **same** head config | yes, on 3,669 exp designs |
+| **ESM** (`--mode esm`) | none — raw 1,280-dim ESM-2 node features | **same** head config | yes, on 3,669 exp designs |
 | **Original head** | frozen `2layers_10hdim_esm` | published `2layers_10hdim_esm_jkmean` classifier | no — inference only |
 
-The ESM row isolates what the graph encoder contributes: identical head
-architecture, identical loss, identical training pool, identical test set, only
-the input representation differs.
+All rows share head architecture, loss, training pool and test set, so only the
+input representation differs. **ESM** isolates what the graph encoder adds over
+raw language-model features; **GraPPI base** isolates what ESM input adds over
+one-hot sequence features within the same graph encoder.
+
+### Why GraPPI base needs its own cache
+
+`apply_esm_features` builds `cat(esm_emb, base[:, 20:])` — it **replaces** the
+20-dim one-hot amino-acid block with ESM. The ESM caches therefore hold
+1,285-dim nodes and no longer contain the 25-dim base features the
+`2layers_10hdim` encoder expects, and ESM embeddings cannot be inverted back
+into one-hot. `cache_graphs_base.py` rebuilds them from the PDBs. That build is
+CPU-only — no ESM model, no GPU — because it runs stage 1 of the pipeline
+alone. Pointing a mode at the wrong cache raises a clear error rather than a
+shape mismatch deep inside the encoder.
 
 ## Data
 
@@ -87,7 +100,8 @@ affected targets accordingly when reading per-target results.
 |---|---|
 | [`config_exp_train_anthr_test.yaml`](./config_exp_train_anthr_test.yaml) | All settings: paths, encoder, head, optimizer, selection |
 | [`cache_graphs_anthr.py`](./cache_graphs_anthr.py) | Builds the Anthropic graph + ESM cache (handles that set's label schema) |
-| [`train_exp_anthr.py`](./train_exp_anthr.py) | Trains on the full exp set, evaluates on Anthropic (`--mode grappi\|esm`) |
+| [`cache_graphs_base.py`](./cache_graphs_base.py) | Builds the 25-dim base-feature caches for `--mode grappi_base` (CPU only, both datasets) |
+| [`train_exp_anthr.py`](./train_exp_anthr.py) | Trains on the full exp set, evaluates on Anthropic (`--mode grappi\|grappi_base\|esm`) |
 | [`score_original_head.py`](./score_original_head.py) | Scores Anthropic with the published head through the same cache and metrics |
 | [`anthr_eval.py`](./anthr_eval.py) | Shared metrics, stratification and output writing |
 | [`compare_results.py`](./compare_results.py) | Merges the three score sets into one comparison table (CPU only) |
@@ -113,7 +127,23 @@ failures. Expect ~1,189 cached graphs. Add `--limit 20` for a quick smoke test
 first — but note that a limited run overwrites the pickle, so rebuild in full
 before training.
 
-### 2. Train and evaluate (the two rows can share a machine on separate GPUs)
+### 1b. Build the base-feature caches (only for `--mode grappi_base`)
+
+CPU only, no GPU and no ESM pass. Both datasets are needed, since the base
+encoder has to see base features at train and test time alike.
+
+```bash
+/home/zhisong/.conda/envs/PPI/bin/python exp_train_anthr_test/cache_graphs_base.py \
+    --dataset exp --workers 20
+/home/zhisong/.conda/envs/PPI/bin/python exp_train_anthr_test/cache_graphs_base.py \
+    --dataset anthr --workers 20
+```
+
+These write `grappi_graphs_base_8A/graphs_base_8A.pkl` under each dataset
+directory. They are much smaller than the ESM caches (25 columns per node
+instead of 1,285).
+
+### 2. Train and evaluate (the rows can share a machine on separate GPUs)
 
 ```bash
 # GraPPI
@@ -121,11 +151,19 @@ before training.
     --config exp_train_anthr_test/config_exp_train_anthr_test.yaml \
     --mode grappi --cuda-id 0
 
-# ESM baseline, in another terminal
+# GraPPI base, in another terminal (needs step 1b)
 /home/zhisong/.conda/envs/PPI/bin/python exp_train_anthr_test/train_exp_anthr.py \
     --config exp_train_anthr_test/config_exp_train_anthr_test.yaml \
-    --mode esm --cuda-id 1
+    --mode grappi_base --cuda-id 1
+
+# ESM baseline
+/home/zhisong/.conda/envs/PPI/bin/python exp_train_anthr_test/train_exp_anthr.py \
+    --config exp_train_anthr_test/config_exp_train_anthr_test.yaml \
+    --mode esm --cuda-id 0
 ```
+
+Each mode writes to its own output directory, named after what produced the
+embeddings, so runs never overwrite each other.
 
 `--cuda-id` is an index into the visible CUDA devices. `--seed` overrides the
 config seed if you want repeat runs.
@@ -169,13 +207,12 @@ comparison CSVs `compare_results.py` writes.
 
 ## Outputs
 
-GraPPI →
-`../GraPPI_data/trained_data_ssl_finetune/2layers_10hdim_esm_exp_train_anthr_test/`
-(the published-head scores land here too);
-ESM →
-`../GraPPI_data/trained_data_ssl_finetune/esm1280_exp_train_anthr_test/`.
+- GraPPI → `../GraPPI_data/trained_data_ssl_finetune/2layers_10hdim_esm_exp_train_anthr_test/`
+  (the published-head scores land here too)
+- GraPPI base → `../GraPPI_data/trained_data_ssl_finetune/2layers_10hdim_exp_train_anthr_test/`
+- ESM → `../GraPPI_data/trained_data_ssl_finetune/esm1280_exp_train_anthr_test/`
 
-Per run, with prefix `anthr_test`, `anthr_test_esm` or
+Per run, with prefix `anthr_test`, `anthr_test_base`, `anthr_test_esm` or
 `anthr_test_original_head`:
 
 - `*_raw_scores.csv` — per-design label, logit, probability, target, design

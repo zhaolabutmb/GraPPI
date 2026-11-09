@@ -54,6 +54,71 @@ from anthr_eval import (  # noqa: E402
 # ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
+#: Per-mode wiring. ``encoder_key``/``embedding_key`` index into the config's
+#: ``encoder`` block; ``cache_key`` indexes into each dataset block. ``esm``
+#: runs no encoder at all, so both encoder keys are None.
+MODES = {
+    'grappi': {
+        'encoder_key': 'dir', 'embedding_key': 'embedding_type',
+        'cache_key': 'graph_cache', 'prefix': 'anthr_test',
+        'node_dim': None,   # ESM cache: validated as esm_dim + 5
+    },
+    'grappi_base': {
+        'encoder_key': 'base_dir', 'embedding_key': 'base_embedding_type',
+        'cache_key': 'graph_cache_base', 'prefix': 'anthr_test_base',
+        'node_dim': 25,
+    },
+    'esm': {
+        'encoder_key': None, 'embedding_key': None,
+        'cache_key': 'graph_cache', 'prefix': 'anthr_test_esm',
+        'node_dim': None,
+    },
+}
+
+
+def mode_spec(mode: str) -> dict:
+    """Look up a mode's wiring, with a readable error for a bad --mode."""
+    if mode not in MODES:
+        raise ValueError(
+            f'Unknown encoder mode: {mode!r}. Choose one of {sorted(MODES)}.')
+    return MODES[mode]
+
+
+def resolve_output_dir(config_dir: Path, mode: str, encoder_dir: Optional[Path],
+                       esm_dim: int = 1280) -> Path:
+    """Per-mode output directory, derived so runs never overwrite each other.
+
+    ``grappi`` keeps the configured directory; the other modes are named after
+    what actually produced the embeddings (the base encoder directory, or the
+    ESM width), which is what distinguishes the runs.
+    """
+    if mode == 'grappi':
+        return config_dir
+    if mode == 'esm':
+        return config_dir.with_name(f'esm{esm_dim}_exp_train_anthr_test')
+    if encoder_dir is None:
+        raise ValueError(f'Mode {mode!r} needs an encoder directory to name its output.')
+    return config_dir.with_name(f'{Path(encoder_dir).name}_exp_train_anthr_test')
+
+
+def validate_node_dim(graphs: Sequence, expected: int, mode: str) -> None:
+    """Fail fast when a cache's feature width does not match the mode.
+
+    Catches the easy mistake of pointing ``grappi_base`` at an ESM cache (whose
+    one-hot block was overwritten by ESM, so it cannot feed a base encoder) or
+    vice versa, instead of surfacing it as an opaque shape error inside the
+    encoder's first linear layer.
+    """
+    for graph in graphs:
+        for node_type in ('receptor', 'ligand'):
+            x = graph[node_type].x
+            if x.ndim != 2 or x.shape[1] != expected:
+                raise ValueError(
+                    f'{graph.name}: mode {mode!r} expects {expected}-dim {node_type} '
+                    f'features, got {tuple(x.shape)}. Check that data.*.graph_cache* '
+                    'points at the cache built for this mode.')
+
+
 def resolve_pos_weight(spec, n_pos: int, n_neg: int) -> float:
     """Resolve ``train.pos_weight`` ('global' -> N_neg/N_pos, else a float)."""
     if isinstance(spec, str) and spec.strip().lower() == 'global':
@@ -176,8 +241,7 @@ def run(config_path: Path, mode: Optional[str] = None,
     train_data_cfg, test_data_cfg = data_cfg['train'], data_cfg['test']
 
     mode = mode or enc_cfg_in.get('mode', 'grappi')
-    if mode not in ('grappi', 'esm'):
-        raise ValueError(f'Unknown encoder mode: {mode!r}')
+    spec = mode_spec(mode)
     esm_dim = int(enc_cfg_in.get('esm_dim', 1280))
 
     device = resolve_device(int(sys_cfg.get('cuda_id', 0)), cuda_id)
@@ -187,18 +251,30 @@ def run(config_path: Path, mode: Optional[str] = None,
     run_seed = int(sys_cfg.get('seed', 42)) if seed is None else int(seed)
     set_seed(run_seed)
 
+    enc_dir_value = (enc_cfg_in.get(spec['encoder_key'])
+                     if spec['encoder_key'] else None)
+    if spec['encoder_key'] and not enc_dir_value:
+        raise ValueError(
+            f"Mode {mode!r} needs encoder.{spec['encoder_key']} in the config.")
+    enc_dir = _abs(REPO_ROOT, enc_dir_value).resolve() if enc_dir_value else None
+
     out_dir = _abs(REPO_ROOT, out_cfg['dir']).resolve()
     if output_dir is not None:
         out_dir = _abs(REPO_ROOT, str(output_dir)).resolve()
-    elif mode == 'esm':
-        out_dir = out_dir.with_name(f'esm{esm_dim}_exp_train_anthr_test')
+    else:
+        out_dir = resolve_output_dir(out_dir, mode, enc_dir, esm_dim)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- caches ----
+    # ---- caches (each mode reads the cache built for its feature type) ----
+    cache_key = spec['cache_key']
     train_dir = _abs(REPO_ROOT, train_data_cfg['data_dir']).resolve()
     test_dir = _abs(REPO_ROOT, test_data_cfg['data_dir']).resolve()
-    train_cache = _abs(train_dir, train_data_cfg['graph_cache'])
-    test_cache = _abs(test_dir, test_data_cfg['graph_cache'])
+    for name, block in (('train', train_data_cfg), ('test', test_data_cfg)):
+        if cache_key not in block:
+            raise ValueError(
+                f"Mode {mode!r} needs data.{name}.{cache_key} in the config.")
+    train_cache = _abs(train_dir, train_data_cfg[cache_key])
+    test_cache = _abs(test_dir, test_data_cfg[cache_key])
 
     tr_names, tr_graphs, tr_targets, tr_labels = load_cache(train_cache)
     te_names, te_graphs, te_targets, te_labels = load_cache(test_cache)
@@ -227,7 +303,6 @@ def run(config_path: Path, mode: Optional[str] = None,
     print(f'WBCE pos_weight = {pos_weight:.4f} (training set only)')
 
     use_amp = device.type == 'cuda'
-    enc_dir = None
     if mode == 'esm':
         embedding_type = 'only_esm' if esm_dim == 1280 else 'only_esm480'
         prepare_esm_graphs(tr_graphs, esm_dim)
@@ -235,10 +310,19 @@ def run(config_path: Path, mode: Optional[str] = None,
         print(f'ESM-only baseline: reusing {esm_dim} cached ESM columns for both '
               'datasets; no GraPPI encoder and no ESM forward pass.')
     else:
-        enc_dir = _abs(REPO_ROOT, enc_cfg_in['dir']).resolve()
+        if spec['node_dim'] is not None:
+            validate_node_dim(tr_graphs, spec['node_dim'], mode)
+            validate_node_dim(te_graphs, spec['node_dim'], mode)
         ckpt = enc_dir / 'ssl_edge_best.pt'
         ssl = load_ssl_config(str(ckpt)) or {}
-        embedding_type = enc_cfg_in.get('embedding_type', ssl.get('embedding_type', 'esm'))
+        embedding_type = enc_cfg_in.get(spec['embedding_key'],
+                                        ssl.get('embedding_type', 'esm'))
+        if embedding_type != ssl.get('embedding_type', embedding_type):
+            raise ValueError(
+                f"Mode {mode!r} uses embedding_type {embedding_type!r}, but "
+                f"{enc_dir.name} was pretrained with "
+                f"{ssl.get('embedding_type')!r}. Point encoder."
+                f"{spec['encoder_key']} at a matching checkpoint.")
         num_layers = int(ssl.get('num_layers', 2))
         hidden_dim = 2 ** int(ssl.get('hidden_dim_power', 10))
         hgt_heads = int(ssl.get('hgt_heads', 4))
@@ -310,7 +394,7 @@ def run(config_path: Path, mode: Optional[str] = None,
         eta_min=float(train_cfg.get('scheduler_eta_min', 1e-6)))
     scaler = GradScaler(enabled=use_amp)
 
-    prefix = 'anthr_test' if mode == 'grappi' else 'anthr_test_esm'
+    prefix = spec['prefix']
     ckpt_path = out_dir / f'{prefix}_best.pt'
     stopper = FineTuneEarlyStopping(
         patience=int(train_cfg.get('patience', 20)),
@@ -413,8 +497,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path,
                         default=Path(__file__).with_name('config_exp_train_anthr_test.yaml'))
-    parser.add_argument('--mode', choices=('grappi', 'esm'),
-                        help='Encoder mode; esm reuses cached ESM features without the GNN.')
+    parser.add_argument('--mode', choices=tuple(MODES),
+                        help='grappi: frozen ESM-input encoder. grappi_base: frozen '
+                             'base-feature encoder (needs the base cache). '
+                             'esm: cached ESM features, no GNN.')
     parser.add_argument('--cuda-id', type=int,
                         help='Visible CUDA device index; overrides system.cuda_id.')
     parser.add_argument('--seed', type=int, help='Overrides system.seed.')

@@ -21,6 +21,8 @@ data:
     labels_csv: labels.csv
     # Cache built by exp_target_retraining/cache_graphs.py — reused unchanged.
     graph_cache: grappi_graphs_esm_8A/graphs_esm_8A.pkl
+    # Base-feature cache for --mode grappi_base (cache_graphs_base.py).
+    graph_cache_base: grappi_graphs_base_8A/graphs_base_8A.pkl
 
   test:
     # Anthropic dataset: 1,320 labeled designs, 1,189 with a released
@@ -35,12 +37,22 @@ data:
     strata: [target, design_model, campaign]
     # Cache built by cache_graphs_anthr.py.
     graph_cache: grappi_graphs_esm_8A/graphs_esm_8A.pkl
+    # Base-feature cache for --mode grappi_base (cache_graphs_base.py).
+    graph_cache_base: grappi_graphs_base_8A/graphs_base_8A.pkl
 
 encoder:
-  mode: grappi                      # --mode esm bypasses the GNN using cached ESM columns
-  # Frozen SSL encoder; architecture is read from this directory's checkpoint.
+  # --mode grappi | grappi_base | esm  (overrides this)
+  #   grappi      -> `dir`, ESM-input encoder, ESM cache
+  #   grappi_base -> `base_dir`, base-feature encoder, base cache
+  #   esm         -> no encoder; cached ESM columns straight into the head
+  mode: grappi
+  # Frozen SSL encoders; architecture is read from each checkpoint.
   dir: ../GraPPI_data/trained_data_ssl_finetune/2layers_10hdim_esm
   embedding_type: esm               # 1280-dim ESM-2 (esm2_t33_650M_UR50D)
+  # GraPPI base: same 2 HGT layers / 2^10 hidden, but pretrained on the 25-dim
+  # base node features instead of ESM.
+  base_dir: ../GraPPI_data/trained_data_ssl_finetune/2layers_10hdim
+  base_embedding_type: base
   esm_dim: 1280
 
 # Classifier head — mirrors 2layers_10hdim_esm_jkmean

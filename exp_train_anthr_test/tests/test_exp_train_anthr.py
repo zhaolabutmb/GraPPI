@@ -21,7 +21,9 @@ for _p in (str(REPO_ROOT), str(PKG_DIR)):
 
 import anthr_eval  # noqa: E402
 import compare_results  # noqa: E402
-from train_exp_anthr import check_disjoint, resolve_pos_weight  # noqa: E402
+from train_exp_anthr import (  # noqa: E402
+    MODES, check_disjoint, mode_spec, resolve_output_dir, resolve_pos_weight,
+)
 
 
 def _rows():
@@ -167,6 +169,51 @@ class TestTrainingHelpers(unittest.TestCase):
     def test_check_disjoint(self):
         self.assertEqual(check_disjoint(['a', 'b'], ['b', 'c']), ['b'])
         self.assertEqual(check_disjoint(['a'], ['b']), [])
+
+
+class TestModeWiring(unittest.TestCase):
+    def test_three_modes_are_registered(self):
+        self.assertEqual(sorted(MODES), ['esm', 'grappi', 'grappi_base'])
+
+    def test_each_mode_has_a_distinct_output_prefix(self):
+        prefixes = [spec['prefix'] for spec in MODES.values()]
+        self.assertEqual(len(prefixes), len(set(prefixes)))
+
+    def test_base_mode_reads_the_base_cache_and_encoder(self):
+        spec = mode_spec('grappi_base')
+        self.assertEqual(spec['cache_key'], 'graph_cache_base')
+        self.assertEqual(spec['encoder_key'], 'base_dir')
+        self.assertEqual(spec['embedding_key'], 'base_embedding_type')
+        self.assertEqual(spec['node_dim'], 25)
+
+    def test_esm_mode_runs_no_encoder(self):
+        spec = mode_spec('esm')
+        self.assertIsNone(spec['encoder_key'])
+        self.assertIsNone(spec['embedding_key'])
+
+    def test_unknown_mode_lists_the_valid_ones(self):
+        with self.assertRaisesRegex(ValueError, "grappi_base"):
+            mode_spec('grappi-base')
+
+    def test_output_dirs_never_collide(self):
+        config_dir = Path('/runs/2layers_10hdim_esm_exp_train_anthr_test')
+        dirs = {
+            resolve_output_dir(config_dir, 'grappi', Path('/ckpt/2layers_10hdim_esm')),
+            resolve_output_dir(config_dir, 'grappi_base', Path('/ckpt/2layers_10hdim')),
+            resolve_output_dir(config_dir, 'esm', None, 1280),
+        }
+        self.assertEqual(len(dirs), 3)
+
+    def test_base_output_dir_named_after_its_encoder(self):
+        out = resolve_output_dir(Path('/runs/2layers_10hdim_esm_exp_train_anthr_test'),
+                                 'grappi_base', Path('/ckpt/2layers_10hdim'))
+        self.assertEqual(out.name, '2layers_10hdim_exp_train_anthr_test')
+
+    def test_grappi_mode_keeps_the_configured_dir(self):
+        config_dir = Path('/runs/2layers_10hdim_esm_exp_train_anthr_test')
+        self.assertEqual(
+            resolve_output_dir(config_dir, 'grappi', Path('/ckpt/2layers_10hdim_esm')),
+            config_dir)
 
 
 class TestComparison(unittest.TestCase):

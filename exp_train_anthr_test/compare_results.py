@@ -27,6 +27,8 @@ from anthr_eval import aggregate, binary_metrics, stratified_metrics  # noqa: E4
 
 DEFAULT_SOURCES = {
     'GraPPI': ('2layers_10hdim_esm_exp_train_anthr_test', 'anthr_test_raw_scores.csv'),
+    'GraPPI base': ('2layers_10hdim_exp_train_anthr_test',
+                    'anthr_test_base_raw_scores.csv'),
     'ESM': ('esm1280_exp_train_anthr_test', 'anthr_test_esm_raw_scores.csv'),
     'Original head': ('2layers_10hdim_esm_exp_train_anthr_test',
                       'anthr_test_original_head_raw_scores.csv'),
